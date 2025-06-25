@@ -96,7 +96,7 @@ class StreamHandler(QObject):
     def __init__(self,crop_width=Acquisition.CROP_WIDTH,crop_height=Acquisition.CROP_HEIGHT,display_resolution_scaling=1):
         QObject.__init__(self)
         self.fps_display = 1
-        self.fps_save = 1
+        self.fps_save = 10
         self.fps_track = 1
         self.timestamp_last_display = 0
         self.timestamp_last_save = 0
@@ -111,9 +111,10 @@ class StreamHandler(QObject):
         self.handler_busy = False
 
         # for fps measurement
-        self.timestamp_last = 0
+        self.timestamp_last = time.perf_counter()
         self.counter = 0
         self.fps_real = 0
+        self.wrte_idx = 0
 
     def start_recording(self):
         self.save_image_flag = True
@@ -173,21 +174,36 @@ class StreamHandler(QObject):
             # @@@ to move to camera
             image_cropped = utils.rotate_and_flip_image(image_cropped,rotate_image_angle=camera.rotate_image_angle,flip_image=camera.flip_image)
 
+            
+            time_now = time.perf_counter()
+            # delta = time_now - self.timestamp_last_save
+            # print(f"Δt = {delta:.6f}s ")
+            # # send image to write (using time)
+            # if self.save_image_flag and time_now-self.timestamp_last_save >= 1/self.fps_save:
+            #     print(f"Δt = {delta:.6f}s  target = {1/self.fps_save:.6f}s")
+                
+            #     self.packet_image_to_write.emit(image_cropped, camera.frame_ID, camera.timestamp)
+                
+                
+            #     self.timestamp_last_save = time_now
             # send image to display
-            time_now = time.time()
             if time_now-self.timestamp_last_display >= 1/self.fps_display:
-                print("readfff_frame_to display")
-                print(time_now)
                 # self.image_to_display.emit(cv2.resize(image_cropped,(round(self.crop_width*self.display_resolution_scaling), round(self.crop_height*self.display_resolution_scaling)),cv2.INTER_LINEAR))
                 self.image_to_display.emit(utils.crop_image(image_cropped,round(self.crop_width*self.display_resolution_scaling), round(self.crop_height*self.display_resolution_scaling)))
                 self.timestamp_last_display = time_now
 
-            # send image to write
-            if self.save_image_flag and time_now-self.timestamp_last_save >= 1/self.fps_save:
-                if camera.is_color:
-                    image_cropped = cv2.cvtColor(image_cropped,cv2.COLOR_RGB2BGR)
-                self.packet_image_to_write.emit(image_cropped,camera.frame_ID,camera.timestamp)
-                self.timestamp_last_save = time_now
+            # send image to write (using index)
+            camera_fps = 5000
+            save_interval = int(camera_fps/ self.fps_save)  # e.g., 5000 / 100 = 50
+
+            if self.save_image_flag and self.wrte_idx % save_interval == 0:
+                self.packet_image_to_write.emit(image_cropped, camera.frame_ID, camera.timestamp)
+                print(f"t = {camera.timestamp:.6f}s  ID = {camera.frame_ID:.0f}")
+            self.wrte_idx += 1
+
+
+
+
 
             # send image to track
             if self.track_flag and time_now-self.timestamp_last_track >= 1/self.fps_track:
@@ -237,14 +253,14 @@ class ImageSaver(QObject):
         self.experiment_ID = ''
         self.image_format = image_format
         self.max_num_image_per_folder = 1000
-        self.queue = Queue(10) # max 10 items in the queue
+        self.queue = Queue(1000) # max 10 items in the queue
         self.image_lock = Lock()
         self.stop_signal_received = False
         self.thread = Thread(target=self.process_queue)
         self.thread.start()
         self.counter = 0
         self.recording_start_time = 0
-        self.recording_time_limit = -1
+        self.recording_time_limit = 5
 
     def process_queue(self):
         while True:
@@ -267,7 +283,8 @@ class ImageSaver(QObject):
                     iio.imwrite(saving_path,image)
                 else:
                     saving_path = os.path.join(self.base_path,self.experiment_ID,str(folder_ID),str(file_ID) + '_' + str(frame_ID) + '.' + self.image_format)
-                    cv2.imwrite(saving_path,image)
+                    cv2.imwrite(saving_path, image)
+
 
                 self.counter = self.counter + 1
                 self.queue.task_done()
@@ -585,14 +602,14 @@ class LiveController(QObject):
         self.camera.is_live = True
         self.camera.start_streaming()
         if self.trigger_mode == TriggerMode.SOFTWARE or ( self.trigger_mode == TriggerMode.HARDWARE and self.use_internal_timer_for_hardware_trigger ):
-            self.camera.enable_callback() # in case it's disabled e.g. by the laser AF controller
-            self._start_triggerred_acquisition()
+            self.camera.start_cont_acquisition_thread()
+            #self._start_triggerred_acquisition()
 
-        # if self.trigger_mode == TriggerMode.CONTINUOUS:
-        #     self.camera.start_cont_acquisition() 
-        # # if controlling the laser displacement measurement camera
-        # if self.for_displacement_measurement:
-        #     self.microcontroller.set_pin_level(MCU_PINS.AF_LASER,1)
+        if self.trigger_mode == TriggerMode.CONTINUOUS:
+            self.camera.start_cont_acquisition_and_save() 
+        # if controlling the laser displacement measurement camera
+        if self.for_displacement_measurement:
+            self.microcontroller.set_pin_level(MCU_PINS.AF_LASER,1)
 
     def stop_live(self):
         if self.is_live:

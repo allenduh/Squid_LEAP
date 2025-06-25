@@ -40,7 +40,6 @@ OUTPUT_PATH = "output/EVT_Py_convert"
 # The output image extension
 OUTPUT_EXTENSION = "tiff"
 
-print("loading dll")
 # Load the C++ shared library (DLL)
 save_lib = ctypes.WinDLL("drivers and libraries/emergent/DirectIO.dll")  # Replace with actual path
 
@@ -215,7 +214,7 @@ def extract_frame_to_numpy(cam: EVT_Py.EvtCamera, frame: EVT_Py.EvtFrame, save_p
         frame_saver.save_frame(np_image, save_path)
 
     end_time = time.time()
-    print(f"extract_frame_to_numpyy np Conversion time: {end_time - start_time:.6f} sec")
+    #print(f"extract_frame_to_numpyy np Conversion time: {end_time - start_time:.6f} sec")
 
     return np_image
 
@@ -443,13 +442,14 @@ class Camera(object):
         self.HeightMax = 3000
         self.OffsetX = 0
         self.OffsetY = 0
+        self.max_frames_save = 50000
 
         self.new_image_callback_external = None
         self.frame_queue = queue.Queue(maxsize=10000)  # Buffer frames safely
         self.frame_saver = FrameSaver()
         self.output_path = "output/EVT_Py_convert"
-        self.batch_size = 100
-        self.max_files_saved = 3000 * 10 / self.batch_size
+        self.batch_size = 10
+        self.max_files_saved = self.max_frames_save * 10 / self.batch_size
 
         
 
@@ -547,14 +547,18 @@ class Camera(object):
         self.is_streaming = True
 
 
-        
-    def start_software_acquisition(self):
+    def start_cont_acquisition_thread(self):
         self.streaming_thread = threading.Thread(target=self.cont_acquisition, daemon=True)
-        self.streaming_thread2 = threading.Thread(target=self.cont_acquisition, daemon=True)
         self.streaming_thread.start()    
 
 
-    def start_cont_acquisition(self):
+    def start_software_acquisition(self):
+        self.streaming_thread = threading.Thread(target=self.cont_acquisition, daemon=True)
+        #self.streaming_thread2 = threading.Thread(target=self.cont_acquisition, daemon=True)
+        self.streaming_thread.start()    
+
+
+    def start_cont_acquisition_and_save(self):
         """Runs the acquisition loop in a separate thread to allow continuous display."""
         self.trigger_mode = "Contineous"
         # Make sure the output path exists
@@ -570,10 +574,9 @@ class Camera(object):
         self.saving_thread.start()
 
         
-        
         start = time.time()
         frame_idx = 0
-        while self.is_streaming:  # Use a flag instead of a fixed loop count
+        while frame_idx <= self.max_frames_save:
 
             frame = self.camera.get_frame()
             # Requeue the frame
@@ -595,7 +598,6 @@ class Camera(object):
                 print(f"total frame = {frame_idx}")
                 print(f"Time before queue full : {time.time() - start} seconds")
                 print("Warning: Frame queue is full, dropping frame")
-                stop_here_hahahah
 
             # No Display 
 
@@ -615,32 +617,26 @@ class Camera(object):
     def cont_acquisition(self):
         """Continuously acquire frames and send them for live display."""
         start = time.time()
-        frame_idx = 0
+        self.frame_ID = 0
         while self.is_streaming:  # Use a flag instead of a fixed loop count
 
             frame = self.camera.get_frame()
             # Requeue the frame
             self.camera.queue_frame(frame)
-            if frame_idx > 0 and frame_idx % FRAME_PRINTOUT_NUM == 0:
-                print(f"{self.camera.id}: {frame_idx} frames")
+            if self.frame_ID > 0 and self.frame_ID % FRAME_PRINTOUT_NUM == 0:
+                print(f"Background acquire: {self.frame_ID} frames")
 
             # Convert frame to NumPy
             np_frame = extract_frame_to_numpy(self.camera, frame)
             self.current_frame = np_frame
 
-            # Add frame to queue (non-blocking)
-            if self.trigger_mode == "Contineous":
-                try:
-                    self.frame_queue.put_nowait(np_frame)
-                except queue.Full:
-                    print("Warning: Frame queue is full, dropping frame")
-        
+            self.timestamp = time.perf_counter()
 
-            # Display frame
-            #self.new_image_callback_external(np_frame)
+            # Display / Save frame in streamhandler -- on new frame
             self.new_image_callback_external(self)
+            self.frame_ID += 1
 
-            frame_idx += 1
+
 
         print("Acquisition stopped.")
         end = time.time()
@@ -831,9 +827,6 @@ class Camera(object):
     def send_trigger(self):
         self.frame_ID = self.frame_ID + 1
         self.timestamp = time.time()
-        print("send trigger at")
-        print(self.timestamp)
-
 
         # if self.is_streaming:
         #     frame = self.camera.get_frame()
@@ -847,7 +840,7 @@ class Camera(object):
 
         if self.new_image_callback_external is not None and self.callback_is_enabled:
             self.new_image_callback_external(self)
-            print("send callback external")
+
     # def send_trigger(self):
     #     self.frame_ID = self.frame_ID + 1
     #     self.timestamp = time.time()

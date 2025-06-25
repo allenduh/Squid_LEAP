@@ -1261,14 +1261,14 @@ class RecordingWidget(QFrame):
         self.entry_saveFPS.setMinimum(0.02)
         self.entry_saveFPS.setMaximum(4000)
         self.entry_saveFPS.setSingleStep(1)
-        self.entry_saveFPS.setValue(1500)
+        self.entry_saveFPS.setValue(10)
         #self.streamHandler.set_save_fps(1)
 
         self.entry_timeLimit = QSpinBox()
         self.entry_timeLimit.setMinimum(-1)
         self.entry_timeLimit.setMaximum(60*60*24*30)
         self.entry_timeLimit.setSingleStep(1)
-        self.entry_timeLimit.setValue(1)
+        self.entry_timeLimit.setValue(5)
 
         self.btn_record = QPushButton("Record")
         self.btn_record.setCheckable(True)
