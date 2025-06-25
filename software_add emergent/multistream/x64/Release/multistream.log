@@ -1,0 +1,96 @@
+﻿  framesave.cpp
+  framesaver.cpp
+C:\emergent\host-new_QT\eSDK\tools\multistream\framesaver\framesaver.h(86,9): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file 'framesave.cpp')
+  
+C:\emergent\host-new_QT\eSDK\tools\multistream\framesaver\framesaver.h(93,9): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file 'framesave.cpp')
+  
+C:\emergent\host-new_QT\eSDK\tools\multistream\framesaver\framesaver.h(86,9): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file 'framesaver/framesaver.cpp')
+  
+C:\emergent\host-new_QT\eSDK\tools\multistream\framesaver\framesaver.h(93,9): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file 'framesaver/framesaver.cpp')
+  
+C:\emergent\host-new_QT\eSDK\tools\multistream\framesaver\framesaver.cpp(73,9): warning C4996: 'strncpy': This function or variable may be unsafe. Consider using strncpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+C:\emergent\host-new_QT\eSDK\tools\multistream\framesaver\framesaver.cpp(87,5): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  threadworker.cpp
+C:\emergent\host-new_QT\eSDK\tools\multistream\framesaver\threadworker.cpp(81,14): warning C4267: 'initializing': conversion from 'size_t' to 'int', possible loss of data
+C:\emergent\host-new_QT\eSDK\tools\multistream\framesaver\threadworker.cpp(108,24): warning C4267: '=': conversion from 'size_t' to 'int', possible loss of data
+C:\emergent\host-new_QT\eSDK\tools\multistream\framesaver\threadworker.cpp(117,25): warning C4267: '=': conversion from 'size_t' to 'int', possible loss of data
+  hwtrigger.cpp
+C:\emergent\host-new_QT\eSDK\tools\multistream\framesaver\framesaver.h(86,9): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file '../../../tools/multistream/hwtrigger.cpp')
+  
+C:\emergent\host-new_QT\eSDK\tools\multistream\framesaver\framesaver.h(93,9): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file '../../../tools/multistream/hwtrigger.cpp')
+  
+  multistream.cpp
+C:\emergent\host-new_QT\eSDK\tools\multistream\framesaver\framesaver.h(86,9): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file '../../../tools/multistream/multistream.cpp')
+  
+C:\emergent\host-new_QT\eSDK\tools\multistream\framesaver\framesaver.h(93,9): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file '../../../tools/multistream/multistream.cpp')
+  
+C:\emergent\host-new_QT\eSDK\tools\multistream\multistream.cpp(111,21): warning C4996: 'localtime': This function or variable may be unsafe. Consider using localtime_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+C:\emergent\host-new_QT\eSDK\tools\multistream\multistream.cpp(118,21): warning C4996: 'localtime': This function or variable may be unsafe. Consider using localtime_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+C:\emergent\host-new_QT\eSDK\tools\multistream\multistream.cpp(119,5): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+C:\emergent\host-new_QT\eSDK\tools\multistream\multistream.cpp(131,13): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+C:\emergent\host-new_QT\eSDK\tools\multistream\multistream.cpp(510,29): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+C:\emergent\host-new_QT\eSDK\tools\multistream\multistream.cpp(513,29): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+C:\emergent\host-new_QT\eSDK\tools\multistream\multistream.cpp(523,25): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  paramsgetset.cpp
+C:\emergent\host-new_QT\eSDK\tools\multistream\framesaver\framesaver.h(86,9): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file '../../../tools/multistream/paramsgetset.cpp')
+  
+C:\emergent\host-new_QT\eSDK\tools\multistream\framesaver\framesaver.h(93,9): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file '../../../tools/multistream/paramsgetset.cpp')
+  
+  parseopts.cpp
+C:\emergent\host-new_QT\eSDK\tools\multistream\framesaver\framesaver.h(86,9): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file '../../../tools/multistream/parseopts.cpp')
+  
+C:\emergent\host-new_QT\eSDK\tools\multistream\framesaver\framesaver.h(93,9): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file '../../../tools/multistream/parseopts.cpp')
+  
+C:\emergent\host-new_QT\eSDK\tools\multistream\parseopts.cpp(147,17): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+C:\emergent\host-new_QT\eSDK\tools\multistream\parseopts.cpp(157,17): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+C:\emergent\host-new_QT\eSDK\tools\multistream\parseopts.cpp(181,17): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+C:\emergent\host-new_QT\eSDK\tools\multistream\parseopts.cpp(186,17): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+C:\emergent\host-new_QT\eSDK\tools\multistream\parseopts.cpp(207,21): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+C:\emergent\host-new_QT\eSDK\tools\multistream\parseopts.cpp(224,17): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+C:\emergent\host-new_QT\eSDK\tools\multistream\parseopts.cpp(232,17): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+C:\emergent\host-new_QT\eSDK\tools\multistream\parseopts.cpp(241,17): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+C:\emergent\host-new_QT\eSDK\tools\multistream\parseopts.cpp(258,17): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+C:\emergent\host-new_QT\eSDK\tools\multistream\parseopts.cpp(273,25): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+C:\emergent\host-new_QT\eSDK\tools\multistream\parseopts.cpp(297,25): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+C:\emergent\host-new_QT\eSDK\tools\multistream\parseopts.cpp(327,25): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+C:\emergent\host-new_QT\eSDK\tools\multistream\parseopts.cpp(366,17): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+C:\emergent\host-new_QT\eSDK\tools\multistream\parseopts.cpp(378,17): warning C4996: 'strcpy': This function or variable may be unsafe. Consider using strcpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+C:\emergent\host-new_QT\eSDK\tools\multistream\parseopts.cpp(166,25): warning C4996: 'strncpy': This function or variable may be unsafe. Consider using strncpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+C:\emergent\host-new_QT\eSDK\tools\multistream\parseopts.cpp(278,37): warning C4996: 'strncpy': This function or variable may be unsafe. Consider using strncpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+C:\emergent\host-new_QT\eSDK\tools\multistream\parseopts.cpp(285,40): warning C4996: 'sscanf': This function or variable may be unsafe. Consider using sscanf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+C:\emergent\host-new_QT\eSDK\tools\multistream\parseopts.cpp(302,37): warning C4996: 'strncpy': This function or variable may be unsafe. Consider using strncpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+C:\emergent\host-new_QT\eSDK\tools\multistream\parseopts.cpp(304,32): warning C4996: 'sscanf': This function or variable may be unsafe. Consider using sscanf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+C:\emergent\host-new_QT\eSDK\tools\multistream\parseopts.cpp(315,35): warning C4996: 'sscanf': This function or variable may be unsafe. Consider using sscanf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+C:\emergent\host-new_QT\eSDK\tools\multistream\parseopts.cpp(357,25): warning C4996: 'strncpy': This function or variable may be unsafe. Consider using strncpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+C:\emergent\host-new_QT\eSDK\tools\multistream\parseopts.cpp(358,33): warning C4996: 'strncpy': This function or variable may be unsafe. Consider using strncpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+C:\emergent\host-new_QT\eSDK\tools\multistream\parseopts.cpp(370,17): warning C4996: 'strncpy': This function or variable may be unsafe. Consider using strncpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+C:\emergent\host-new_QT\eSDK\tools\multistream\parseopts.cpp(374,17): warning C4996: 'strncpy': This function or variable may be unsafe. Consider using strncpy_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+C:\emergent\host-new_QT\eSDK\tools\multistream\parseopts.cpp(382,20): warning C4996: 'sscanf': This function or variable may be unsafe. Consider using sscanf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+C:\emergent\host-new_QT\eSDK\tools\multistream\parseopts.cpp(385,24): warning C4996: 'sscanf': This function or variable may be unsafe. Consider using sscanf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  ptp.cpp
+C:\emergent\host-new_QT\eSDK\tools\multistream\framesaver\framesaver.h(86,9): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file '../../../tools/multistream/ptp.cpp')
+  
+C:\emergent\host-new_QT\eSDK\tools\multistream\framesaver\framesaver.h(93,9): warning C4996: 'sprintf': This function or variable may be unsafe. Consider using sprintf_s instead. To disable deprecation, use _CRT_SECURE_NO_WARNINGS. See online help for details.
+  (compiling source file '../../../tools/multistream/ptp.cpp')
+  
+  getopt.c
+  Generating code
+  Previous IPDB not found, fall back to full compilation.
+  All 172 functions were compiled because no usable IPDB/IOBJ from previous compilation was found.
+  Finished generating code
+  multistream.vcxproj -> C:\emergent\host-new_QT\eSDK\x64\Release\multistream.exe
+  A subdirectory or file C:\emergent\host-new_QT\emergentInstall_out\eSDK\tools\ already exists.
+          1 file(s) copied.
