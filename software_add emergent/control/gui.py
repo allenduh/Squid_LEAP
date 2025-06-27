@@ -13,8 +13,10 @@ import control.widgets as widgets
 import control.camera_emergent as camera
 import control.core as core
 import control.microcontroller as microcontroller
+import control.widgets_ephysDisplay as widgets_ephysDisplay
 from control._def import *
 import squid.logging
+
 
 import pyqtgraph.dockarea as dock
 SINGLE_WINDOW = True # set to False if use separate windows for display and control
@@ -39,10 +41,18 @@ class OctopiGUI(QMainWindow):
         # self.imageDisplayWindow.show()
         # self.imageArrayDisplayWindow.show()
 
+        # Live display
+        self.ephysDisplay = widgets_ephysDisplay.Display(self.imageDisplayWindow)
+        self.ROIControl = widgets_ephysDisplay.ROIControlWidget(self.imageDisplayWindow)
+
         # image display windows
         self.imageDisplayTabs = QTabWidget()
         self.imageDisplayTabs.addTab(self.imageDisplayWindow.widget, "Live View")
         self.imageDisplayTabs.addTab(self.imageArrayDisplayWindow.widget, "Multichannel Acquisition")
+        self.imageDisplayTabs.addTab(self.ephysDisplay, "MEA live")
+
+        viewer = widgets_ephysDisplay.RawViewerWidget(folder="output/EVT_Py_convert", bin_size=128)
+        self.imageDisplayTabs.addTab(viewer, "viewer")
 
         # load objects
         if is_simulation:
@@ -114,6 +124,7 @@ class OctopiGUI(QMainWindow):
         self.recordTabWidget.addTab(self.recordingControlWidget, "Simple Recording")
         # self.recordTabWidget.addTab(self.multiPointWidget, "Multipoint Acquisition")
 
+
         # layout widgets
         layout = QVBoxLayout() 
         layout.addWidget(self.cameraSettingWidget)
@@ -125,6 +136,7 @@ class OctopiGUI(QMainWindow):
         layout.addWidget(self.autofocusWidget)
         layout.addWidget(self.recordTabWidget)
         layout.addWidget(self.objectivesWidget)
+        layout.addWidget(self.ROIControl)
         layout.addStretch()
 
         # transfer the layout to the central widget
@@ -145,6 +157,13 @@ class OctopiGUI(QMainWindow):
             dock_controlPanel.addWidget(self.centralWidget)
             dock_controlPanel.setStretch(x=1,y=None)
             dock_controlPanel.setFixedWidth(dock_controlPanel.minimumSizeHint().width())
+
+            # dock_MEA = dock.Dock('Live MEA', autoOrientation = False)
+            # dock_MEA.showTitleBar()
+            # dock_MEA.addWidget(self.ephysDisplay)
+            # dock_MEA.setStretch(x=1, y=None)
+
+
             main_dockArea = dock.DockArea()
             main_dockArea.addDock(dock_display)
             main_dockArea.addDock(dock_controlPanel,'right')
@@ -153,6 +172,9 @@ class OctopiGUI(QMainWindow):
             height_min = 0.9*desktopWidget.height()
             width_min = 0.96*desktopWidget.width()
             self.setMinimumSize(int(width_min),int(height_min))
+
+
+            #dock_ROI.setFixedHeight(4 * dock_ROI.minimumSizeHint().height())
         else:
             self.setCentralWidget(self.centralWidget)
             self.tabbedImageDisplayWindow = QMainWindow()
@@ -200,6 +222,9 @@ class OctopiGUI(QMainWindow):
 
             self.multipointController.napari_layers_init.connect(self.napariMultiChannelWidget.initLayers)
             self.multipointController.napari_layers_update.connect(self.napariMultiChannelWidget.updateLayers)
+
+        self.ROIControl.multi_channel_ephys.connect(self.ephysDisplay.plot_multichannel_ephys)
+
 
     def onStartLive(self):
         print(self.camera.exposure_time)
