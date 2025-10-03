@@ -51,8 +51,8 @@ class OctopiGUI(QMainWindow):
         self.imageDisplayTabs.addTab(self.imageArrayDisplayWindow.widget, "Multichannel Acquisition")
         self.imageDisplayTabs.addTab(self.ephysDisplay, "MEA live")
 
-        viewer = widgets_ephysDisplay.RawViewerWidget(folder="output/EVT_Py_convert", bin_size=128)
-        self.imageDisplayTabs.addTab(viewer, "viewer")
+        #viewer = widgets_ephysDisplay.RawViewerWidget(folder="output/EVT_Py_convert _100mV_J9367_301", bin_size=128)
+        #self.imageDisplayTabs.addTab(viewer, "viewer")
 
         # load objects
         if is_simulation:

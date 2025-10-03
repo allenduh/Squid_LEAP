@@ -328,7 +328,7 @@ def configure_camera(cam: EVT_Py.EvtCamera):
     EVT_Util.set_param_max(cam, "Height")
     EVT_Util.set_param(cam, "FrameRate", 100)
     EVT_Util.set_param(cam, "Exposure", 160)
-    EVT_Util.set_param(cam, "FrameRate", 5000)
+    EVT_Util.set_param(cam, "FrameRate", 2000)
 
     EVT_Util.set_param_max(cam, "LineTime")
     EVT_Util.set_param(cam, "LineTime", 105)
@@ -442,7 +442,7 @@ class Camera(object):
         self.HeightMax = 3000
         self.OffsetX = 0
         self.OffsetY = 0
-        self.max_frames_save = 50000
+        self.max_frames_save = 20000
 
         self.new_image_callback_external = None
         self.frame_queue = queue.Queue(maxsize=10000)  # Buffer frames safely
