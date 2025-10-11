@@ -11,6 +11,7 @@ from qtpy.QtGui import *
 # app specific libraries
 import control.widgets as widgets
 import control.camera_emergent as camera
+#import control.camera_emergent_WORKING_indexed as camera
 import control.core as core
 import control.microcontroller as microcontroller
 import control.widgets_ephysDisplay as widgets_ephysDisplay
@@ -111,6 +112,10 @@ class OctopiGUI(QMainWindow):
         self.dacControlWidget = widgets.DACControWidget(self.microcontroller)
         self.autofocusWidget = widgets.AutoFocusWidget(self.autofocusController)
         self.recordingControlWidget = widgets.RecordingWidget(self.streamHandler,self.imageSaver)
+        
+        self.recordingControlWidget.set_live_widget(self.liveControlWidget) # enable changing from software to contineous
+        self.recordingControlWidget.set_camera(self.camera)
+        
         if ENABLE_TRACKING:
             self.trackingControlWidget = widgets.TrackingControllerWidget(self.trackingController,self.configurationManager,show_configurations=TRACKING_SHOW_MICROSCOPE_CONFIGURATIONS)
         self.multiPointWidget = widgets.MultiPointWidget(self.multipointController,self.configurationManager)

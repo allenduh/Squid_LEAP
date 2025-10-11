@@ -1,7 +1,29 @@
-"""Camera acquisition and high-speed saving for Emergent EVT_Py cameras.
-Conservative style pass: import de-duplication and whitespace cleanup only.
-Functionality is intentionally unchanged.
-"""
+# =============================================================================
+# CAMERA EMERGENT — WORKING FILE (Indexed)
+# High-level layout / quick index
+# -----------------------------------------------------------------------------
+# [1] Imports & third-party dependencies
+# [2] Configuration constants (dimensions, FPS/exposure defaults, paths)
+# [3] Direct I/O DLL binding (C++ shared library for fast disk writes)
+# [4] Async frame saving helpers (legacy thread + current process-based)
+# [5] Batch save helpers (Direct I/O vs np.save)
+# [6] Frame extraction & conversion utilities (fast zero-copy paths)
+# [7] Utility / legacy helpers (serial lookup, single-frame save, test grab loop)
+# [8] Camera setup (configure_camera)
+# [9] Camera class
+#     9.1 Lifecycle & device open
+#     9.2 Streaming control (start/stop)
+#     9.3 Acquisition loops (display vs continuous saving)
+#     9.4 Saving workers (one-by-one, batched direct I/O)
+#     9.5 Callbacks, getters/setters, misc.
+# [10] Camera_Simulation class (drop-in fake for UI/testing)
+# =============================================================================
+# =============================================================================
+# [1] IMPORTS & THIRD-PARTY DEPENDENCIES
+#   - Core libs: argparse, os, time, threading, multiprocessing, ctypes
+#   - Numeric/Imaging: numpy, cv2, PIL, imageio, matplotlib
+#   - Camera SDK: EVT_Py + helpers (EvtPixelFormat, EvtBitConvert, etc.)
+# =============================================================================
 
 import argparse
 import cv2
@@ -28,6 +50,13 @@ from EVT_Py.EVT_Py import EvtColorConvert
 import matplotlib.pyplot as plt
 
 # Number of frame buffers to be allocated and used for acquisition
+# =============================================================================
+# [2] CONFIGURATION CONSTANTS
+#   - Buffer counts, frame totals, print cadence
+#   - Sensor dimensions for fast paths (WIDTH_HZ / HEIGHT_HZ)
+#   - DEFAULT_FPS / DEFAULT_EXPOSURE_US for per-run overrides
+#   - Output directory & default image extension
+# =============================================================================
 NUM_ALLOCATED_FRAMES = 10
 
 # Number of frames total to grab before closing
@@ -50,6 +79,12 @@ OUTPUT_PATH = "output/EVT_Py_convert"
 OUTPUT_EXTENSION = "tiff"
 
 # Load the C++ shared library (DLL)
+# =============================================================================
+# [3] DIRECT I/O DLL BINDING
+#   - Loads the Windows DLL providing save_direct_io(path, *data, nbytes)
+#   - Used by batched saving to cut Python overhead (raw bytes on disk)
+#   - NOTE: Ensure DLL path exists on your machine.
+# =============================================================================
 save_lib = ctypes.WinDLL("drivers and libraries/emergent/DirectIO.dll")  # Replace with actual path
 
 # Define the function signature
@@ -67,6 +102,12 @@ import cv2
 import imageio
 from PIL import Image
 from multiprocessing import Process, Queue
+# =============================================================================
+# [4] ASYNC FRAME SAVING HELPERS
+#   - FrameSaver_old: thread + queue; supports multiple formats (cv2, imageio)
+#   - FrameSaver:     separate process + Queue for higher throughput (.npy)
+#   * Both are infrastructure; higher-level code enqueues frames for saving.
+# =============================================================================
 
 
 class FrameSaver_old:
@@ -150,6 +191,12 @@ class FrameSaver:
     def stop(self):
         """Ensure all frames are saved before exiting."""
         self.saving_process.join()
+# =============================================================================
+# [5] BATCH SAVE HELPERS
+#   - save_batch_direct_io: write raw bytes via DLL; prints pointer/write timings
+#   - save_batch_np_save:   baseline .npy save timing (concatenates frames)
+#   * Choose Direct I/O for maximum throughput when writing large batches.
+# =============================================================================
 
 
 
@@ -180,20 +227,20 @@ def save_batch_np_save(filename, frames):
     end_time = time.time()
     print(f"np.save time: {end_time - start_time:.6f} sec")
 
-# Example Usage
+# # Example Usage save_batch_direct_io, save_batch_np_save
 
 # frames = [np.random.randint(0, 256, (WIDTH_HZ, HEIGHT_HZ), dtype=np.uint8) for _ in range(100)]
-# # Make sure the output path exists
-# os.makedirs(OUTPUT_PATH, exist_ok=True)
-
-# # Test direct I/O method
 # np_data = np.array(frames)
+# os.makedirs(OUTPUT_PATH, exist_ok=True)
 # save_batch_direct_io(f"{OUTPUT_PATH}/testdirect", np_data)
-
-
-# # Test np.save method
-
 # save_batch_np_save(f"{OUTPUT_PATH}/test_np_save", frames)
+# =============================================================================
+# [6] FRAME EXTRACTION & CONVERSION UTILITIES
+#   - Zero-copy conversions from EVT frame to NumPy (MONO8 fast path)
+#   - extract_frame_to_numpy: return array; optional async save
+#   - extract_frame_to_numpy_: minimal variant (returns array)
+#   - extract_frame_pointer:   memory buffer pointer for ultra-fast queuing
+# =============================================================================
 
 
 def extract_frame_to_numpy(cam: EVT_Py.EvtCamera, frame: EVT_Py.EvtFrame, save_path=None):
@@ -271,6 +318,12 @@ def extract_frame_pointer(cam: EVT_Py.EvtCamera, frame: EVT_Py.EvtFrame):
     cam.release_frame(conversion_frame)
 
     return buffer_ptr        
+# =============================================================================
+# [7] UTILITY / LEGACY HELPERS
+#   - get_sn_by_model: scan devices by model (legacy)
+#   - convert_and_save_frame: one-off save using PIL
+#   - run_grab_loop: simple test grabber saving TIFFs to OUTPUT_PATH
+# =============================================================================
 
 
 def get_sn_by_model(model_name):
@@ -318,34 +371,12 @@ def convert_and_save_frame(cam: EVT_Py.EvtCamera, frame: EVT_Py.EvtFrame, path: 
 
     im = Image.frombytes(image_mode, (frame.width, frame.height), img_bytes, 'raw')
     im.save(path)
+# =============================================================================
+# [8] CAMERA SETUP
+#   - configure_camera: apply binning, max ROI, FPS, exposure, linetime, gain
+#   - Prints active pixel format + exposure/FPS for traceability
+# =============================================================================
 
-def configure_camera(cam: EVT_Py.EvtCamera):
-
-    # EVT_Util.set_param_str(cam, "Bin", "2x2")
-    # EVT_Util.set_param_max(cam, "Width")
-    # EVT_Util.set_param_max(cam, "Height")
-    # EVT_Util.set_param(cam, "FrameRate", 100)
-    # EVT_Util.set_param(cam, "Exposure", 260)
-    # EVT_Util.set_param(cam, "FrameRate", 3000)
-
-    # EVT_Util.set_param_max(cam, "LineTime")
-    # EVT_Util.set_param(cam, "LineTime", 175)
-    # EVT_Util.set_param(cam, "Gain", 256)
-##
-    EVT_Util.set_param_str(cam, "Bin", "2x2")
-    EVT_Util.set_param_max(cam, "Width")
-    EVT_Util.set_param_max(cam, "Height")
-    EVT_Util.set_param(cam, "FrameRate", 100)
-    EVT_Util.set_param(cam, "Exposure", 160)
-    EVT_Util.set_param(cam, "FrameRate", 2000)
-
-    EVT_Util.set_param_max(cam, "LineTime")
-    EVT_Util.set_param(cam, "LineTime", 105)
-    EVT_Util.set_param(cam, "Gain", 256)
-
-
-    pixel_type = EVT_Py.EvtPixelFormat(cam.get_enum_int("PixelFormat"))
-    print(f"\tPixelFormat: {pixel_type.name}")
 
 def configure_camera(cam: EVT_Py.EvtCamera, fps: int = DEFAULT_FPS, exposure_us: int = DEFAULT_EXPOSURE_US):
     """
@@ -358,12 +389,12 @@ def configure_camera(cam: EVT_Py.EvtCamera, fps: int = DEFAULT_FPS, exposure_us:
     EVT_Util.set_param_max(cam, "Height")
 
     # Exposure / frame rate
-    EVT_Util.set_param(cam, "Exposure", int(exposure_us))
-    EVT_Util.set_param(cam, "FrameRate", int(fps))
+    EVT_Util.set_param(cam, "Exposure", int(exposure_us)) # 160
+    EVT_Util.set_param(cam, "FrameRate", int(fps)) # 5000
 
     # Keep your LineTime/Gain, but don't hardcode FPS/exposure again
     EVT_Util.set_param_max(cam, "LineTime")
-    EVT_Util.set_param(cam, "LineTime", 105)
+    EVT_Util.set_param(cam, "LineTime", 105) # 3000fps LineTime 175 exposure 260
     EVT_Util.set_param(cam, "Gain", 256)
 
     pixel_type = EVT_Py.EvtPixelFormat(cam.get_enum_int("PixelFormat"))
@@ -409,6 +440,17 @@ def run_grab_loop(cam: EVT_Py.EvtCamera) -> None:
     cam.execute_command("AcquisitionStop")
     print(f"{cam.id}: Stopped streaming")
     print(f"{cam.id}: Dropped frames = {num_dropped_frames}")
+# =============================================================================
+# [9] CAMERA CLASS — MASTER RUNTIME
+#   - Wraps EVT context/device, streaming, acquisition, saving pipelines
+#   - Designed for both live display and high-throughput recording
+#   ---------------------------------------------------------------------------
+#   [9.1] Lifecycle & device open
+#   [9.2] Streaming control (start/stop)
+#   [9.3] Acquisition loops (display vs continuous saving)
+#   [9.4] Saving workers (one-by-one, batched direct I/O)
+#   [9.5] Callbacks, getters/setters, misc.
+# =============================================================================
 
 
 
@@ -473,10 +515,10 @@ class Camera(object):
         self.HeightMax = 3000
         self.OffsetX = 0
         self.OffsetY = 0
-        self.max_frames_save = 20*5000
+        self.max_frames_save = 20000
 
         self.new_image_callback_external = None
-        self.frame_queue = queue.Queue(maxsize=12000)  # Buffer frames safely
+        self.frame_queue = queue.Queue(maxsize=10000)  # Buffer frames safely
         self.frame_saver = FrameSaver()
         self.output_path = "output/EVT_Py_convert"
         self.batch_size = 10
@@ -485,11 +527,7 @@ class Camera(object):
         
 
         
-    def set_output_path(self, path: str):
-        """Set per-run output folder and ensure it exists."""
-        self.output_path = os.path.abspath(path)
-        os.makedirs(self.output_path, exist_ok=True)
-        print(f"[Camera] output_path = {self.output_path}")
+
 
     def open(self,index=0):
 
@@ -528,6 +566,7 @@ class Camera(object):
 
 
 
+
     def set_callback(self,function):
         self.new_image_callback_external = function
 
@@ -547,8 +586,11 @@ class Camera(object):
     def close(self):
         pass
 
-    def set_exposure_time(self,exposure_time):
-        pass
+    def set_fps(self, fps: int):
+        EVT_Util.set_param(self.camera, "FrameRate", int(fps))
+
+    def set_exposure_time(self,exposure_time_ms): 
+        EVT_Util.set_param(self.camera, "Exposure", int(exposure_time_ms * 1000))
 
     def update_camera_exposure_time(self):
         pass
@@ -599,8 +641,8 @@ class Camera(object):
         """Runs the acquisition loop in a separate thread to allow continuous display."""
         self.trigger_mode = "Contineous"
         # Make sure the output path exists
-        #os.makedirs(OUTPUT_PATH, exist_ok=True)
-        os.makedirs(self.output_path, exist_ok=True)
+        os.makedirs(OUTPUT_PATH, exist_ok=True)
+
  
         # queue up all our frames
         for _ in range(NUM_ALLOCATED_FRAMES):
@@ -918,6 +960,11 @@ class Camera(object):
 
     def set_line3_to_exposure_active(self):
         pass
+# =============================================================================
+# [10] CAMERA_SIMULATION CLASS
+#   - Drop-in stand-in for UI/dev without hardware
+#   - send_trigger() rolls a synthetic frame for downstream testing
+# =============================================================================
 
 
 

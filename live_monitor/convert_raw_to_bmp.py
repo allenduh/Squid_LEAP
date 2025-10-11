@@ -66,7 +66,8 @@ def convert_one_raw(raw_path: Path, batch_idx: int, out_dir: Path):
         # file name must match your desired BMP_RE = r"^(\d+)_(\d+)\.bmp$"
         # so it's "<batch>_<frame>.bmp" (digits only). We'll zero pad frame to 3 for readability,
         # but it's still digits-only and matches your regex.
-        bmp_name = f"{batch_idx}_{i:03d}.bmp"
+        combined = batch_idx * FRAMES_PER_FILE + i
+        bmp_name = f"{combined}.bmp"
         imageio.imwrite(out_dir / bmp_name, frames[i].astype(np.uint8))
         saved += 1
     return saved

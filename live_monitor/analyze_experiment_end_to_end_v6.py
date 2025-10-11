@@ -80,6 +80,11 @@ BMP_PATTERNS = [
     re.compile(r'(?i)^(\d+)[_-](\d+)\.bmp$'),
 ]
 
+BMP_PATTERNS = [
+re.compile(r"(?i)^batch[_-]?(\d+)[_-]frame[_-]?(\d+)\.bmp$"), # batch-style
+re.compile(r"(?i)^(\d+)[_-](\d+)\.bmp$"), # plain n1_sep_n2
+]
+
 def _natural_key(name: str):
     # makes 2 < 10 for mixed text+digits
     return [int(t) if t.isdigit() else t.lower() for t in re.split(r'(\d+)', name)]
@@ -141,26 +146,67 @@ def choose_experiment(path: Path) -> ExperimentPath:
 
 # ------------------------------ Image I/O ------------------------------
 
+# def find_first_bmp(exp: Path) -> Path:
+#     subdirs = [d for d in exp.iterdir() if d.is_dir() and not d.name.startswith(".")]
+#     best_sub = exp/"0" if (exp/"0").exists() else None
+#     if best_sub is None:
+#         nums = [d for d in subdirs if d.name.isdigit()]
+#         if nums:
+#             best_sub = sorted(nums, key=lambda p:int(p.name))[0]
+#     if best_sub is None:
+#         best_sub = exp
+#     cands = []
+#     for f in best_sub.iterdir():
+#         if f.is_file() and f.suffix.lower()==".bmp":
+#             m = BMP_RE.match(f.name)
+#             if m:
+#                 frame, glob = int(m.group(1)), int(m.group(2))
+#                 cands.append((glob, frame, f))
+#     if not cands:
+#         raise FileNotFoundError(f"No BMP files found in {best_sub}")
+#     cands.sort(key=lambda t: (t[0], t[1]))
+#     return cands[0][2]
+
+
 def find_first_bmp(exp: Path) -> Path:
-    subdirs = [d for d in exp.iterdir() if d.is_dir() and not d.name.startswith(".")]
-    best_sub = exp/"0" if (exp/"0").exists() else None
-    if best_sub is None:
-        nums = [d for d in subdirs if d.name.isdigit()]
-        if nums:
-            best_sub = sorted(nums, key=lambda p:int(p.name))[0]
-    if best_sub is None:
-        best_sub = exp
-    cands = []
-    for f in best_sub.iterdir():
-        if f.is_file() and f.suffix.lower()==".bmp":
-            m = BMP_RE.match(f.name)
-            if m:
-                frame, glob = int(m.group(1)), int(m.group(2))
-                cands.append((glob, frame, f))
-    if not cands:
-        raise FileNotFoundError(f"No BMP files found in {best_sub}")
-    cands.sort(key=lambda t: (t[0], t[1]))
-    return cands[0][2]
+    """
+    Return the earliest BMP frame under the experiment directory.
+    Looks in (priority): bmp_export/, 0/, numeric subdirs, then root; searches recursively.
+    Accepts both 'batch_##_frame_##.bmp' and '##_##.bmp' patterns via BMP_PATTERNS.
+    Falls back to the first '*.bmp' if none match the patterns.
+    """
+    # Build prioritized bases
+    bases: list[Path] = []
+    if (exp / "bmp_export").exists():
+        bases.append(exp / "bmp_export")
+    if (exp / "0").exists():
+        bases.append(exp / "0")
+    nums = [d for d in exp.iterdir() if d.is_dir() and d.name.isdigit()]
+    bases.extend(sorted(nums, key=lambda p: int(p.name)))
+    bases.append(exp)
+
+    # First try: pattern-aware match (batch/frame or plain digits)
+    cands: list[tuple[int,int,Path]] = []
+    for base in bases:
+        for f in sorted(base.rglob("*.bmp"), key=lambda p: _natural_key(p.name)):
+            for pat in BMP_PATTERNS:
+                m = pat.match(f.name)
+                if m:
+                    b, fr = int(m.group(1)), int(m.group(2))
+                    cands.append((b, fr, f))
+                    break
+    if cands:
+        cands.sort(key=lambda t: (t[0], t[1]))
+        return cands[0][2]
+
+    # Fallback: any .bmp (in case names are non-standard)
+    any_bmp = next((exp.rglob("*.bmp")), None)
+    if any_bmp:
+        return any_bmp
+
+    raise FileNotFoundError(f"No BMP files found under {exp}")
+
+
 
 # def list_all_frames(exp: Path) -> List[Path]:
 #     tuples = []

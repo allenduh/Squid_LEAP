@@ -1,8 +1,3 @@
-"""Camera acquisition and high-speed saving for Emergent EVT_Py cameras.
-Conservative style pass: import de-duplication and whitespace cleanup only.
-Functionality is intentionally unchanged.
-"""
-
 import argparse
 import cv2
 import time
@@ -182,18 +177,18 @@ def save_batch_np_save(filename, frames):
 
 # Example Usage
 
-# frames = [np.random.randint(0, 256, (WIDTH_HZ, HEIGHT_HZ), dtype=np.uint8) for _ in range(100)]
-# # Make sure the output path exists
-# os.makedirs(OUTPUT_PATH, exist_ok=True)
+frames = [np.random.randint(0, 256, (WIDTH_HZ, HEIGHT_HZ), dtype=np.uint8) for _ in range(100)]
+# Make sure the output path exists
+os.makedirs(OUTPUT_PATH, exist_ok=True)
 
-# # Test direct I/O method
-# np_data = np.array(frames)
-# save_batch_direct_io(f"{OUTPUT_PATH}/testdirect", np_data)
+# Test direct I/O method
+np_data = np.array(frames)
+save_batch_direct_io(f"{OUTPUT_PATH}/testdirect", np_data)
 
 
-# # Test np.save method
+# Test np.save method
 
-# save_batch_np_save(f"{OUTPUT_PATH}/test_np_save", frames)
+save_batch_np_save(f"{OUTPUT_PATH}/test_np_save", frames)
 
 
 def extract_frame_to_numpy(cam: EVT_Py.EvtCamera, frame: EVT_Py.EvtFrame, save_path=None):
@@ -473,10 +468,10 @@ class Camera(object):
         self.HeightMax = 3000
         self.OffsetX = 0
         self.OffsetY = 0
-        self.max_frames_save = 20*5000
+        self.max_frames_save = 20000
 
         self.new_image_callback_external = None
-        self.frame_queue = queue.Queue(maxsize=12000)  # Buffer frames safely
+        self.frame_queue = queue.Queue(maxsize=10000)  # Buffer frames safely
         self.frame_saver = FrameSaver()
         self.output_path = "output/EVT_Py_convert"
         self.batch_size = 10
@@ -485,11 +480,7 @@ class Camera(object):
         
 
         
-    def set_output_path(self, path: str):
-        """Set per-run output folder and ensure it exists."""
-        self.output_path = os.path.abspath(path)
-        os.makedirs(self.output_path, exist_ok=True)
-        print(f"[Camera] output_path = {self.output_path}")
+
 
     def open(self,index=0):
 
@@ -599,8 +590,8 @@ class Camera(object):
         """Runs the acquisition loop in a separate thread to allow continuous display."""
         self.trigger_mode = "Contineous"
         # Make sure the output path exists
-        #os.makedirs(OUTPUT_PATH, exist_ok=True)
-        os.makedirs(self.output_path, exist_ok=True)
+        os.makedirs(OUTPUT_PATH, exist_ok=True)
+
  
         # queue up all our frames
         for _ in range(NUM_ALLOCATED_FRAMES):

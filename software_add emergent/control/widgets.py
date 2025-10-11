@@ -1275,6 +1275,11 @@ class RecordingWidget(QFrame):
         self.btn_record.setChecked(False)
         self.btn_record.setDefault(False)
 
+        self.btn_record_5000fps = QPushButton("5000fps Record")
+        self.btn_record_5000fps.setCheckable(True)
+        self.btn_record_5000fps.setChecked(False)
+        self.btn_record_5000fps.setDefault(False)
+
         grid_line1 = QGridLayout()
         grid_line1.addWidget(QLabel('Saving Path'))
         grid_line1.addWidget(self.lineEdit_savingDir, 0,1)
@@ -1295,6 +1300,7 @@ class RecordingWidget(QFrame):
         self.grid.addLayout(grid_line2)
         self.grid.addLayout(grid_line3)
         self.grid.addWidget(self.btn_record)
+        self.grid.addWidget(self.btn_record_5000fps)
         self.setLayout(self.grid)
 
         # add and display a timer - to be implemented
@@ -1303,9 +1309,24 @@ class RecordingWidget(QFrame):
         # connections
         self.btn_setSavingDir.clicked.connect(self.set_saving_dir)
         self.btn_record.clicked.connect(self.toggle_recording)
+        self.btn_record_5000fps.clicked.connect(self.toggle_recording_5000fps)
         self.entry_saveFPS.valueChanged.connect(self.streamHandler.set_save_fps)
         self.entry_timeLimit.valueChanged.connect(self.imageSaver.set_recording_time_limit)
         self.imageSaver.stop_recording.connect(self.stop_recording)
+
+    def set_live_widget(self, live_widget):
+        """
+        Inject the LiveControlWidget so toggle_recording_5000fps can
+        set trigger mode to CONTINUOUS and start/stop Live.
+        """
+        self.liveWidget = live_widget
+
+    def set_camera(self, camera):
+        """
+        Inject the Emergent Camera instance so we can point it at the
+        correct output folder before starting Continuous+Live.
+        """
+        self.camera = camera
 
     def set_saving_dir(self):
         dialog = QFileDialog()
@@ -1313,6 +1334,8 @@ class RecordingWidget(QFrame):
         self.imageSaver.set_base_path(save_dir_base)
         self.lineEdit_savingDir.setText(save_dir_base)
         self.base_path_is_set = True
+
+        self.camera.set_output_path(save_dir_base)
 
     def toggle_recording(self,pressed):
         if self.base_path_is_set == False:
@@ -1392,9 +1415,58 @@ class RecordingWidget(QFrame):
 
 
         else:
+            #self.imageSaver.start_new_experiment(self.lineEdit_experimentID.text())
             self.streamHandler.stop_recording()
             self.lineEdit_experimentID.setEnabled(True)
             self.btn_setSavingDir.setEnabled(True)
+
+
+    def toggle_recording_5000fps(self, pressed):
+        # Require base path
+        if self.base_path_is_set == False:
+            self.btn_record.setChecked(False)
+            msg = QMessageBox()
+            msg.setText("Please choose base saving directory first")
+            msg.exec_()
+            return
+
+        if pressed:
+            try:
+                self.experiment_ID = self.lineEdit_experimentID.text() + '_' + datetime.now().strftime('%Y-%m-%d_%H-%M-%S.%f')
+                
+                target = os.path.join(self.lineEdit_savingDir.text(),self.experiment_ID)
+                os.mkdir(target)
+                
+                self.camera.set_output_path(target)
+                self.camera.is_live = True
+                self.camera.start_streaming()
+                self.camera.start_cont_acquisition_and_save()
+
+
+            except Exception as e:
+                # Fail safe: revert UI state
+                self.btn_record_5000fps.setChecked(False)
+                self.lineEdit_experimentID.setEnabled(True)
+                self.btn_setSavingDir.setEnabled(True)
+                QMessageBox.critical(None, "Error", f"Failed to start Live (Continuous): {e}")
+                return
+
+
+        
+        else:
+            # Stop Live if running
+            try:
+                self.camera.is_live = False
+                self.stop_streaming()
+                
+                if self.liveWidget.btn_live.isChecked():
+                    self.liveWidget.btn_live.setChecked(False)
+                    self.liveWidget.toggle_live(False)
+            finally:
+                # Re-enable edits
+                self.lineEdit_experimentID.setEnabled(True)
+                self.btn_setSavingDir.setEnabled(True)
+
 
     # stop_recording can be called by imageSaver
     def stop_recording(self):

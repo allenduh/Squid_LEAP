@@ -1,8 +1,3 @@
-"""Camera acquisition and high-speed saving for Emergent EVT_Py cameras.
-Conservative style pass: import de-duplication and whitespace cleanup only.
-Functionality is intentionally unchanged.
-"""
-
 import argparse
 import cv2
 import time
@@ -39,10 +34,6 @@ FRAME_PRINTOUT_NUM = 1000
 WIDTH_HZ = 1024
 HEIGHT_HZ = 608
 
-# --- Acquisition defaults (override per run) ---
-DEFAULT_FPS = 5000              # frames per second
-DEFAULT_EXPOSURE_US = 160       # microseconds, e.g. 160 us = 0.16 ms
-
 # The path to save the output
 OUTPUT_PATH = "output/EVT_Py_convert"
 
@@ -56,6 +47,38 @@ save_lib = ctypes.WinDLL("drivers and libraries/emergent/DirectIO.dll")  # Repla
 save_lib.save_direct_io.argtypes = [ctypes.c_char_p, ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t]
 save_lib.save_direct_io.restype = ctypes.c_int  # Returns bytes written
 print("loadedd dll")
+
+
+# ==== Minimal additions for configurable timing & safe destination selection ====
+# Utilities kept local to avoid changing other modules.
+def _choose_parent_folder(default_dir: str = None):
+    try:
+        import tkinter as _tk
+        from tkinter import filedialog as _fd
+        _r = _tk.Tk(); _r.withdraw()
+        d = _fd.askdirectory(title="Choose destination parent folder", initialdir=default_dir or ".")
+        _r.destroy()
+        if d: return d
+    except Exception:
+        pass
+    return None
+
+def _ask_run_name(initial: str):
+    try:
+        import tkinter as _tk
+        from tkinter import simpledialog as _sd
+        _r = _tk.Tk(); _r.withdraw()
+        s = _sd.askstring("Run name", "Enter a folder name for this recording:", initialvalue=initial)
+        _r.destroy()
+        return s
+    except Exception:
+        return initial
+
+def _timestamp_str():
+    import datetime as _dt
+    return _dt.datetime.now().strftime("%Y%m%d_%H%M%S")
+# ==== end utilities ====
+
 
 
 
@@ -182,18 +205,18 @@ def save_batch_np_save(filename, frames):
 
 # Example Usage
 
-# frames = [np.random.randint(0, 256, (WIDTH_HZ, HEIGHT_HZ), dtype=np.uint8) for _ in range(100)]
-# # Make sure the output path exists
-# os.makedirs(OUTPUT_PATH, exist_ok=True)
+frames = [np.random.randint(0, 256, (WIDTH_HZ, HEIGHT_HZ), dtype=np.uint8) for _ in range(100)]
+# Make sure the output path exists
+os.makedirs(OUTPUT_PATH, exist_ok=True)
 
-# # Test direct I/O method
-# np_data = np.array(frames)
-# save_batch_direct_io(f"{OUTPUT_PATH}/testdirect", np_data)
+# Test direct I/O method
+np_data = np.array(frames)
+save_batch_direct_io(f"{OUTPUT_PATH}/testdirect", np_data)
 
 
-# # Test np.save method
+# Test np.save method
 
-# save_batch_np_save(f"{OUTPUT_PATH}/test_np_save", frames)
+save_batch_np_save(f"{OUTPUT_PATH}/test_np_save", frames)
 
 
 def extract_frame_to_numpy(cam: EVT_Py.EvtCamera, frame: EVT_Py.EvtFrame, save_path=None):
@@ -347,28 +370,6 @@ def configure_camera(cam: EVT_Py.EvtCamera):
     pixel_type = EVT_Py.EvtPixelFormat(cam.get_enum_int("PixelFormat"))
     print(f"\tPixelFormat: {pixel_type.name}")
 
-def configure_camera(cam: EVT_Py.EvtCamera, fps: int = DEFAULT_FPS, exposure_us: int = DEFAULT_EXPOSURE_US):
-    """
-    Minimal, predictable config. We only set what we must, and we pass FPS/exposure in.
-    exposure_us is in microseconds (160 -> 0.16 ms).
-    """
-    # Sensor binning and max ROI
-    EVT_Util.set_param_str(cam, "Bin", "2x2")
-    EVT_Util.set_param_max(cam, "Width")
-    EVT_Util.set_param_max(cam, "Height")
-
-    # Exposure / frame rate
-    EVT_Util.set_param(cam, "Exposure", int(exposure_us))
-    EVT_Util.set_param(cam, "FrameRate", int(fps))
-
-    # Keep your LineTime/Gain, but don't hardcode FPS/exposure again
-    EVT_Util.set_param_max(cam, "LineTime")
-    EVT_Util.set_param(cam, "LineTime", 105)
-    EVT_Util.set_param(cam, "Gain", 256)
-
-    pixel_type = EVT_Py.EvtPixelFormat(cam.get_enum_int("PixelFormat"))
-    print(f"\tPixelFormat: {pixel_type.name} | Exposure(us)={exposure_us} | FPS={fps}")
-
 def run_grab_loop(cam: EVT_Py.EvtCamera) -> None:
     # start streaming
     cam.execute_command("AcquisitionStart")
@@ -396,11 +397,11 @@ def run_grab_loop(cam: EVT_Py.EvtCamera) -> None:
         else:
             frame_id_prev = frame.frame_id
 
-        convert_and_save_frame(cam, frame, f"{OUTPUT_PATH}/test-{cam.id}-{frame_idx}.{OUTPUT_EXTENSION}")
+        convert_and_save_frame(cam, frame, f"{self.output_path}/test-{cam.id}-{frame_idx}.{OUTPUT_EXTENSION}")
         # Save the last frame to disk.
         # if frame_idx == NUM_FRAMES_TO_GRAB - 1:
         #     print(f"{cam.id}: Saving last frame")
-        #     convert_and_save_frame(cam, frame, f"{OUTPUT_PATH}/test-{cam.id}-{frame_idx}.{OUTPUT_EXTENSION}")
+        #     convert_and_save_frame(cam, frame, f"{self.output_path}/test-{cam.id}-{frame_idx}.{OUTPUT_EXTENSION}")
 
         # Requeue the frame
         cam.queue_frame(frame)
@@ -415,6 +416,10 @@ def run_grab_loop(cam: EVT_Py.EvtCamera) -> None:
 class Camera(object):
 
     def __init__(self,sn=None,is_global_shutter=False,rotate_image_angle=None,flip_image=None):
+        # pending (optional) timing updates for continuous acquisition
+        self._pending_exposure_ms = None
+        self._pending_fps = None
+
 
         # Initialize the EVT_Py context
         self.evt_context = EVT_Py.EvtContext()
@@ -473,10 +478,10 @@ class Camera(object):
         self.HeightMax = 3000
         self.OffsetX = 0
         self.OffsetY = 0
-        self.max_frames_save = 20*5000
+        self.max_frames_save = 20000
 
         self.new_image_callback_external = None
-        self.frame_queue = queue.Queue(maxsize=12000)  # Buffer frames safely
+        self.frame_queue = queue.Queue(maxsize=10000)  # Buffer frames safely
         self.frame_saver = FrameSaver()
         self.output_path = "output/EVT_Py_convert"
         self.batch_size = 10
@@ -485,11 +490,7 @@ class Camera(object):
         
 
         
-    def set_output_path(self, path: str):
-        """Set per-run output folder and ensure it exists."""
-        self.output_path = os.path.abspath(path)
-        os.makedirs(self.output_path, exist_ok=True)
-        print(f"[Camera] output_path = {self.output_path}")
+
 
     def open(self,index=0):
 
@@ -522,9 +523,7 @@ class Camera(object):
         self.camera = self.evt_context.open_camera(first_dev_info, open_camera_params)
 
         # Configure the camera
-        #configure_camera(self.camera)
-        configure_camera(self.camera, fps=getattr(self, "fps", DEFAULT_FPS),
-                 exposure_us=getattr(self, "exposure_us", DEFAULT_EXPOSURE_US))
+        configure_camera(self.camera)
 
 
 
@@ -547,8 +546,18 @@ class Camera(object):
     def close(self):
         pass
 
-    def set_exposure_time(self,exposure_time):
-        pass
+    """Set exposure time in milliseconds; applies immediately if camera is open and stores the value for next continuous run."""
+try:
+    exposure_time = args[0]
+except Exception:
+    return
+self._pending_exposure_ms = float(exposure_time)
+try:
+    EVT_Util.set_param(self.camera, "Exposure", float(exposure_time))
+except Exception:
+    # ignore if camera not yet open
+    pass
+
 
     def update_camera_exposure_time(self):
         pass
@@ -597,10 +606,35 @@ class Camera(object):
 
     def start_cont_acquisition_and_save(self):
         """Runs the acquisition loop in a separate thread to allow continuous display."""
+        # Choose destination safely and avoid overwrites
+        import os
+        parent = _choose_parent_folder(self.output_path)
+        ts = _timestamp_str()
+        default_name = f"EVT_Py_convert_{ts}"
+        run_name = _ask_run_name(default_name) or default_name
+        # ensure unique folder
+        target = os.path.join(parent or self.output_path, run_name)
+        base = target
+        k = 1
+        while os.path.exists(target):
+            target = f"{base}_{k}"; k += 1
+        os.makedirs(target, exist_ok=True)
+        self.output_path = target
+        # Apply pending timing if provided
+        try:
+            if self._pending_exposure_ms is not None:
+                EVT_Util.set_param(self.camera, "Exposure", float(self._pending_exposure_ms))
+            if self._pending_fps is not None:
+                EVT_Util.set_param(self.camera, "FrameRate", float(self._pending_fps))
+        except Exception:
+            pass
+        # Mark streaming True so saver runs
+        self.is_streaming = True
+
         self.trigger_mode = "Contineous"
         # Make sure the output path exists
-        #os.makedirs(OUTPUT_PATH, exist_ok=True)
         os.makedirs(self.output_path, exist_ok=True)
+
  
         # queue up all our frames
         for _ in range(NUM_ALLOCATED_FRAMES):
@@ -645,6 +679,7 @@ class Camera(object):
         print("Acquisition stopped.")
         end = time.time()
         print(f"Total duration: {end - start} seconds")
+        return self.output_path
 
 
 
@@ -690,9 +725,9 @@ class Camera(object):
             try:
                 buffer_ptr = self.frame_queue.get(timeout=1)  # Wait for a frame pointer
                 start_time = time.time()
-                #self.frame_saver.save_frame(frame_to_save, f"{OUTPUT_PATH}/testnp-{self.camera.id}-{frame_idx}")
+                #self.frame_saver.save_frame(frame_to_save, f"{self.output_path}/testnp-{self.camera.id}-{frame_idx}")
                 np_image = np.frombuffer(memoryview(buffer_ptr), dtype=np.uint8).reshape(HEIGHT_HZ, WIDTH_HZ)
-                np.save(f"{OUTPUT_PATH}/testnp-{self.camera.id}-{frame_idx}", np_image)
+                np.save(f"{self.output_path}/testnp-{self.camera.id}-{frame_idx}", np_image)
                 print(f"File saved in {time.time() - start_time:.6f} sec")
 
                 frame_idx += 1
@@ -814,11 +849,11 @@ class Camera(object):
                 
 
                 # Queue frame for asynchronous saving
-            #frame_saver.save_frame(np_image, f"{OUTPUT_PATH}/testnp-{self.camera.id}-{frame_idx}")
+            #frame_saver.save_frame(np_image, f"{self.output_path}/testnp-{self.camera.id}-{frame_idx}")
 
                 # Pass the frame to the display callback (ensure it accepts np_frame)
                 #self.new_image_callback_external(self)
-            self.current_frame = frame_saver.save_frame(np_image, f"{OUTPUT_PATH}/testnp-{self.camera.id}-{frame_idx}")
+            self.current_frame = frame_saver.save_frame(np_image, f"{self.output_path}/testnp-{self.camera.id}-{frame_idx}")
             # Requeue the frame
             self.camera.queue_frame(frame)
 
@@ -924,6 +959,10 @@ class Camera(object):
 class Camera_Simulation(object):
 
     def __init__(self,sn=None,is_global_shutter=False,rotate_image_angle=None,flip_image=None):
+        # pending (optional) timing updates for continuous acquisition
+        self._pending_exposure_ms = None
+        self._pending_fps = None
+
         # many to be purged
         self.sn = sn
         self.is_global_shutter = is_global_shutter
@@ -1002,8 +1041,18 @@ class Camera_Simulation(object):
     def close(self):
         pass
 
-    def set_exposure_time(self,exposure_time):
-        pass
+    """Set exposure time in milliseconds; applies immediately if camera is open and stores the value for next continuous run."""
+try:
+    exposure_time = args[0]
+except Exception:
+    return
+self._pending_exposure_ms = float(exposure_time)
+try:
+    EVT_Util.set_param(self.camera, "Exposure", float(exposure_time))
+except Exception:
+    # ignore if camera not yet open
+    pass
+
 
     def update_camera_exposure_time(self):
         pass
