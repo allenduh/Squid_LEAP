@@ -473,7 +473,7 @@ class Camera(object):
         self.HeightMax = 3000
         self.OffsetX = 0
         self.OffsetY = 0
-        self.max_frames_save = 20*5000
+        self.max_frames_save = 20*5000  # Important for fast read mode 
 
         self.new_image_callback_external = None
         self.frame_queue = queue.Queue(maxsize=12000)  # Buffer frames safely

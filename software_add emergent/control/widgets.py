@@ -1424,7 +1424,7 @@ class RecordingWidget(QFrame):
     def toggle_recording_5000fps(self, pressed):
         # Require base path
         if self.base_path_is_set == False:
-            self.btn_record.setChecked(False)
+            self.btn_record_5000fps.setChecked(False)
             msg = QMessageBox()
             msg.setText("Please choose base saving directory first")
             msg.exec_()
@@ -1438,10 +1438,14 @@ class RecordingWidget(QFrame):
                 os.mkdir(target)
                 
                 self.camera.set_output_path(target)
+                self.camera.set_max_frame(5000 * self.entry_timeLimit.value()) ## TO DO
                 self.camera.is_live = True
-                self.camera.start_streaming()
-                self.camera.start_cont_acquisition_and_save()
-
+                #######self.camera.start_streaming()
+                
+                self.camera.start_cont_acquisition_and_save() # had start_strem effect included
+                print("widgets -- toggle_recording_5000fps Done")
+                self.camera.is_live = False
+                self.btn_record_5000fps.setChecked(False)
 
             except Exception as e:
                 # Fail safe: revert UI state
@@ -1457,7 +1461,6 @@ class RecordingWidget(QFrame):
             # Stop Live if running
             try:
                 self.camera.is_live = False
-                self.stop_streaming()
                 
                 if self.liveWidget.btn_live.isChecked():
                     self.liveWidget.btn_live.setChecked(False)
@@ -1471,7 +1474,7 @@ class RecordingWidget(QFrame):
     # stop_recording can be called by imageSaver
     def stop_recording(self):
         self.lineEdit_experimentID.setEnabled(True)
-        self.btn_record.setChecked(False)
+        self.btn_record_5000fps.setChecked(False)
         self.streamHandler.stop_recording()
         self.btn_setSavingDir.setEnabled(True)
 

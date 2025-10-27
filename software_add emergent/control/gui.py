@@ -10,7 +10,7 @@ from qtpy.QtGui import *
 
 # app specific libraries
 import control.widgets as widgets
-import control.camera_emergent as camera
+import control.camera_emergent_cleaned as camera
 #import control.camera_emergent_WORKING_indexed as camera
 import control.core as core
 import control.microcontroller as microcontroller
