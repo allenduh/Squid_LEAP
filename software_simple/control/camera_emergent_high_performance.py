@@ -19,6 +19,7 @@ import matplotlib.pyplot as plt
 import queue
 import imageio
 from multiprocessing import Process, Queue
+from concurrent.futures import ThreadPoolExecutor
 
 
 # Import the EVT_Py API
@@ -37,8 +38,9 @@ NUM_FRAMES_TO_GRAB = 2000
 # Print status every X frames
 FRAME_PRINTOUT_NUM = 1000
 
-WIDTH_HZ = 1024
-HEIGHT_HZ = 608
+FRAMES_PER_FILE   = 10
+HEIGHT_HZ         = 608
+WIDTH_HZ          = 1024
 
 # --- Acquisition defaults (override per run) ---
 DEFAULT_FPS = 5000              # frames per second
@@ -53,47 +55,10 @@ save_lib.save_direct_io.argtypes = [ctypes.c_char_p, ctypes.POINTER(ctypes.c_uin
 save_lib.save_direct_io.restype = ctypes.c_int  # Returns bytes written
 
 
-# save_lib = ctypes.WinDLL("cpp/save_direct_io.dll")  # Replace with actual path
-# save_lib.save_direct_io.argtypes = [ctypes.c_char_p, ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t]
-# save_lib.save_direct_io.restype = ctypes.c_int  # Returns bytes written
-
-
-# save_lib.save_direct_io_ovlp_ex.argtypes = [
-#     ctypes.c_char_p,                        # path
-#     ctypes.POINTER(ctypes.c_uint8),         # data
-#     ctypes.c_size_t,                        # nbytes
-#     ctypes.c_int, ctypes.c_int,             # use_direct, queue_depth
-#     ctypes.c_size_t,                        # chunk_bytes
-#     ctypes.c_int, ctypes.c_int              # write_through, preallocate
-# ]
-# save_lib.save_direct_io_ovlp_ex.restype = ctypes.c_size_t
-
 def save_batch_direct_io(filename, np_data):
     """Save batch of frames using direct I/O"""
     data_ptr = np_data.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8))
     bytes_written = save_lib.save_direct_io(filename.encode('utf-8'), data_ptr, np_data.nbytes)
-
-def save_batch_direct_io_(filename, np_data):
-    """Save batch of frames using direct I/O"""
-
-    # Time the conversion to ctypes pointer
-    #start_ptr_time = time.time()
-    data_ptr = np_data.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8))
-    #end_ptr_time = time.time()
-    #ptr_time = end_ptr_time - start_ptr_time  # Time for pointer conversion
-
-    # Time the direct I/O saving process
-    #start_io_time = time.time()
-    bytes_written = save_lib.save_direct_io(filename.encode('utf-8'), data_ptr, np_data.nbytes)
-    #end_io_time = time.time()
-    #io_time = end_io_time - start_io_time  # Time for Direct I/O write
-
-    #print(f" data_ptr conversion time: {ptr_time:.6f} sec | Direct I/O time: {io_time:.6f} sec")
-
-    #if bytes_written == -1:
-    #    raise IOError("Direct I/O write failed")
-
-
 
 def save_batch_np_save(filename, frames):
     np_data = np.concatenate(frames, axis=0).astype(np.uint8)
@@ -101,21 +66,6 @@ def save_batch_np_save(filename, frames):
     np.save(filename, np_data)
     end_time = time.time()
     print(f"np.save time: {end_time - start_time:.6f} sec")
-
-# Example Usage
-
-# frames = [np.random.randint(0, 256, (WIDTH_HZ, HEIGHT_HZ), dtype=np.uint8) for _ in range(100)]
-# # Make sure the output path exists
-# os.makedirs(OUTPUT_PATH, exist_ok=True)
-
-# # Test direct I/O method
-# np_data = np.array(frames)
-# save_batch_direct_io(f"{OUTPUT_PATH}/testdirect", np_data)
-
-
-# # Test np.save method
-
-# save_batch_np_save(f"{OUTPUT_PATH}/test_np_save", frames)
 
 
 def extract_frame_to_numpy(cam: EVT_Py.EvtCamera, frame: EVT_Py.EvtFrame, save_path=None):
@@ -322,10 +272,37 @@ class Camera(object):
         self.batch_size = 10
         self.bin = 16
         self.frame_batch = np.zeros((self.batch_size, HEIGHT_HZ, WIDTH_HZ), dtype=np.uint8)  # Pre-allocated 3D array
-        self.frame_batch_bin = np.zeros((self.max_frames_save, HEIGHT_HZ//self.bin, WIDTH_HZ//self.bin), dtype=np.uint8)  # Pre-allocated 3D array
+        self.frame_batch_bin = np.zeros((self.max_frames_save, HEIGHT_HZ//self.bin, WIDTH_HZ//self.bin), dtype=np.uint16)  # Pre-allocated 3D array
         self.hh = HEIGHT_HZ // self.bin
         self.ww = WIDTH_HZ // self.bin
+        self.want_binning = False
+        self.bytes_per_frame = HEIGHT_HZ * WIDTH_HZ
 
+
+    
+    # ---- allocate & manage ping-pong batches ----
+    # ---------- Minimal helpers (no ping-pong, no single-frame fallback) ----------
+    def _make_work_batch(self):
+        total_bytes     = self.bytes_per_frame * self.batch_size
+        buf  = (ctypes.c_uint8 * total_bytes)()
+        view = np.frombuffer(buf, dtype=np.uint8).reshape(self.batch_size, HEIGHT_HZ, WIDTH_HZ)
+        return buf, view
+
+    def _memcpy_frame_into_slot(self, dst_buf, slot, src_ptr):
+        # src_ptr can be int address or ctypes.c_void_p
+        # if hasattr(src_ptr, "value"):
+        #     src_ptr = src_ptr.value
+        dst_addr = ctypes.addressof(dst_buf) + slot * self.bytes_per_frame
+        ctypes.memmove(dst_addr, src_ptr, self.bytes_per_frame)
+
+    def _bin_batch_view(self, batch_view, bin_size):
+        Hbin = (HEIGHT_HZ // bin_size) * bin_size
+        Wbin = (WIDTH_HZ  // bin_size) * bin_size
+        Hg   = Hbin // bin_size
+        Wg   = Wbin // bin_size
+        return (batch_view[:, :Hbin, :Wbin]
+                .reshape(batch_view.shape[0], Hg, bin_size, Wg, bin_size)
+                .mean(axis=(2,4), dtype=np.float32))   # shape (B, Hg, Wg)
         
     def bin_batch_frames(self, arr) -> np.ndarray:
        
@@ -440,195 +417,111 @@ class Camera(object):
         self.streaming_thread.start()    
 
     # KEY function wiidget call toggle_recording_5000fps
+    # ---------- Producer (batch-at-source, no ping-pong) ----------
     def start_high_performance_recording(self):
-        """Runs the acquisition loop in a separate thread to allow continuous display."""
-        #self.trigger_mode = "Contineous"
+        """
+        Batches at source:
+        - Copies each frame into a single working contiguous batch
+        - On full batch, enqueues a COPY of the batch view to the saver thread
+        """
         self.camera.open_stream()
-
-        # Make sure the output path exists
         os.makedirs(self.output_path, exist_ok=True)
- 
-        # queue up all our frames
-        for _ in range(NUM_ALLOCATED_FRAMES):
-            frame = self.camera.allocate_frame()
-            self.camera.queue_frame(frame)
 
-        self.is_streaming = True # saving_thread check is_streaming first
-        self.camera.execute_command("AcquisitionStart")  
+        # Prequeue camera buffers
+        for _ in range(NUM_ALLOCATED_FRAMES):
+            f = self.camera.allocate_frame()
+            self.camera.queue_frame(f)
+
+        # Ensure queues/flags
+        self.batch_queue = queue.Queue(maxsize=1024)
+        self.is_streaming = True
+        self.high_performance_recording = True
+
+        # Working batch (single buffer)
+        self.work_buf, self.work_view = self._make_work_batch()
+        fill_idx   = 0
+        batch_id   = 0
+        frame_idx  = 0
+        dropped    = 0
+
+        # Start saver
         self.saving_thread = threading.Thread(target=self.saving_worker, daemon=True)
         self.saving_thread.start()
-        
-        start = time.time()
-        frame_idx = 0
-        dropped_pointers = 0
-        
-        while frame_idx <= self.max_frames_save and self.high_performance_recording:
-            # Add frame to queue 
-            try:
-                frame = self.camera.get_frame()  # in EVT_Py.py
-                self.camera.queue_frame(frame) # Requeue the frame see EVT_Py.py
-                frame_pointer = extract_frame_pointer(self.camera, frame)
-                frame_idx += 1
 
-                self.frame_queue.put_nowait(frame_pointer)
-                if frame_idx > 0 and frame_idx % FRAME_PRINTOUT_NUM == 0:
-                    print(f"Enqueue pointers: {frame_idx} frames")
+        self.camera.execute_command("AcquisitionStart")
+        t0 = time.time()
 
-            except:
-                dropped_pointers += 1
+        try:
+            while frame_idx < self.max_frames_save and self.high_performance_recording:
+                try:
+                    frame = self.camera.get_frame()
+                    self.camera.queue_frame(frame)  # return to driver ASAP
+                    frame_ptr = extract_frame_pointer(self.camera, frame)
 
-        end = time.time()
-        print("dropped_pointers = ", dropped_pointers)
-        print(f"Moving pointers total duration: {end - start} seconds")
-        self.high_performance_recording = False
+                    # Copy into working batch
+                    self._memcpy_frame_into_slot(self.work_buf, fill_idx, frame_ptr)
+                    fill_idx  += 1
+                    frame_idx += 1
 
+                    # If batch full: enqueue a COPY (to avoid overwrite while saver runs)
+                    if fill_idx >= self.batch_size:
+                        fill_idx = 0
+                        batch_id += 1
 
+                    if frame_idx and (frame_idx % FRAME_PRINTOUT_NUM == 0):
+                        print(f"[Producer] enqueued frames: {frame_idx}")
 
-    def saving_worker_progress(self):
-        """Save frames from the queue in batches and benchmark DLL speed."""
+                except Exception:
+                    dropped += 1
+                    # keep going; log if you want
 
-        FRAME_BYTES = HEIGHT_HZ * WIDTH_HZ                   # 622,592 (multiple of 4096 ✅)
-        BATCH_FRAMES = self.batch_size
-        BATCH_BYTES  = self.frame_batch.nbytes               # should be FRAME_BYTES * BATCH_FRAMES
+        finally:
+            # Flush partial batch (if any)
+            if fill_idx > 0:
+                self.batch_queue.put((work_view[:fill_idx].copy(), batch_id))
 
-        save_idx = 0
-        frame_idx = 0
-        frames_save_failed = 0
+            self.high_performance_recording = False
+            t1 = time.time()
+            print(f"[Producer] dropped={dropped} | duration={t1 - t0:.3f}s")
 
-        # Rolling stats
-        batches = 0
-        total_written = 0
-        total_write_time = 0.0
-
-        # Pre-encode output folder once
-        out_dir_b = self.output_path.encode("utf-8")
-
-        # Main loop
-        while self.high_performance_recording or not self.frame_queue.empty():
-            try:
-                # 1) Get raw frame buffer from queue
-                t_np0 = time.perf_counter()
-                buffer_ptr = self.frame_queue.get(timeout=1)
-                # Parse without copying, then reshape for your stacked assign
-                np_image = np.frombuffer(memoryview(buffer_ptr), dtype=np.uint8, count=FRAME_BYTES)\
-                            .reshape(HEIGHT_HZ, WIDTH_HZ)
-                np_image_time = time.perf_counter() - t_np0
-
-                # 2) Place into preallocated batch
-                self.frame_batch[frame_idx] = np_image
-                frame_idx += 1
-
-                # 3) Mark processed
-                self.frame_queue.task_done()
-
-                # 4) If batch is full → write once with overlapped direct I/O
-                if frame_idx >= BATCH_FRAMES:
-                    # Build filename (bytes)
-                    filename_b = out_dir_b + b"/batch_" + str(save_idx).encode("ascii") + b".raw"
-
-                    # Convert NumPy batch to pointer + size
-                    data_ptr = self.frame_batch.ctypes.data_as(ctypes.POINTER(ctypes.c_uint8))
-                    nbytes   = ctypes.c_size_t(BATCH_BYTES)
-
-                    # Tunables: queue_depth & chunk size (try 8–32 MiB)
-                    QUEUE = 32
-                    CHUNK = 1024*608
-                    t_w0 = time.perf_counter()
-                    written = save_lib.save_direct_io_ovlp_ex(
-                        filename_b, data_ptr, nbytes,
-                        1,          # use_direct (NO_BUFFERING)
-                        QUEUE,      # queue_depth
-                        CHUNK,      # chunk_bytes
-                        0,          # write_through OFF for speed
-                        1           # preallocate ON
-                    )
-                    write_time = time.perf_counter() - t_w0
-
-                    # Stats / checks
-                    ok = (written == BATCH_BYTES)
-                    if not ok:
-                        frames_save_failed += BATCH_FRAMES
-
-                    batches += 1
-                    total_written += int(written)
-                    total_write_time += write_time
-
-                    mb = written / (1024*1024)
-                    mbps = mb / write_time if write_time > 0 else 0.0
-                    avg_mbps = (total_written / (1024*1024)) / total_write_time if total_write_time > 0 else 0.0
-
-                    print(
-                        f"Saved batch {save_idx:04d} | frames: {BATCH_FRAMES} | "
-                        f"np_image: {np_image_time*1000:.3f} ms | "
-                        f"write: {write_time*1000:.1f} ms ({mbps:.1f} MB/s) | "
-                        f"avg: {avg_mbps:.1f} MB/s | ok={ok}"
-                    )
-
-                    # Reset for next batch
-                    save_idx += 1
-                    frame_idx = 0
-
-            except Exception:
-                # Timeout or benign hiccup; keep looping
-                pass
-
-        print(f"[done] batches={batches}, avg_write={(total_written/(1024*1024))/max(total_write_time,1e-9):.1f} MB/s, "
-            f"failed_frames={frames_save_failed}")
-        self.stop_streaming()
-
-
-    # KEY function wiidget call toggle_recording_5000fps running background
+    # ---------- Saver (only whole batches) ----------
     def saving_worker(self):
-        """Save frames from the queue in batches using np.savez_compressed."""
-        batch_save_idx = 0 
-        frame_idx = 0  
-        allocate_idx = 0 # inner-index 1-10
-        frames_save_failed = 0
+        """
+        Consumes (batch_view, batch_id) from self.batch_queue.
+        Writes RAW with DirectIO, then optional vectorized binning.
+        """
 
-        while self.high_performance_recording or not self.frame_queue.empty():
+
+        while self.high_performance_recording or not self.work_buf.empty():
             try:
-                # Get the frame from the queue and put into np array
-                start_time = time.time()
+                batch_view, bid = self.work_buf.get(timeout=0.05)  # (B,H,W) uint8
+            except queue.Empty:
+                continue
 
-                buffer_ptr = self.frame_queue.get(timeout=1)  
-                np_image = np.frombuffer(memoryview(buffer_ptr), dtype=np.uint8).reshape(HEIGHT_HZ, WIDTH_HZ)
-                #self.frame_batch_bin[frame_idx, :, :] = self.bin_single_frame(np_image)
-                self.frame_batch[allocate_idx] = np_image
+            # 1) save RAW
+            out = f"{self.output_path}/batch_{bid}.raw"
+            save_batch_direct_io(out, batch_view)
 
-                np_image_time = time.time() - start_time  
+            # 2) optional bin
+            if self.want_binning:
+                binned = self._bin_batch_view(batch_view, self.bin)  # (B, Hg, Wg) float32
+                if hasattr(self, "frame_batch_bin"):
+                    start = bid * self.batch_size
+                    end   = start + self.batch_size
 
-                # Mark the frame as processed
-                self.frame_queue.task_done()
-                frame_idx += 1
-                allocate_idx += 1  
+                    self.frame_batch_bin[start:end] = binned
+                    self.work_buf.task_done()
 
-                # If batch is full, save and reset
-                if allocate_idx >= self.batch_size:
-                    save_start_time = time.time()
-                    save_batch_direct_io(f"{self.output_path}/batch_{batch_save_idx}.raw", self.frame_batch)
-                    save_time = time.time() - save_start_time  
-
-                    batch_save_idx += 1
-                    allocate_idx = 0
-
-                    print(f"Saved batch {batch_save_idx} | np_image time: {np_image_time:.6f}s | save time: {save_time:.6f}s")
-
-            except:
-                frames_save_failed += 1
-
-        print("Finished all frame pointers saving. Failed saved = ", frames_save_failed)
-
+        print("[Saver] finished.")
         self.after_high_performance_recording()
 
     def after_high_performance_recording(self):
         self.stop_streaming()
 
         print("save binned frames...")
-        #np.save(f"{self.output_path}/binned_16x16", self.frame_batch_bin)
+        if self.want_binning:
+            np.save(f"{self.output_path}/binned_16x16", self.frame_batch_bin)
         print("plot binned frames")
-        
-    
-
 
     def cont_acquisition(self):  ## Used in software acqusition
         """Continuously acquire frames and send them for live display."""
