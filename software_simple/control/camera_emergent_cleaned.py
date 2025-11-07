@@ -316,7 +316,7 @@ class Camera(object):
         self.max_frames_save = 5*5000  # Important for fast read mode 
 
         self.new_image_callback_external = None
-        self.frame_queue = queue.Queue(maxsize=50000)  # Buffer frames safely
+        self.frame_queue = queue.Queue(maxsize=100000)  # Buffer frames safely
         #self.frame_saver = FrameSaver()
         self.output_path = "output/EVT_Py_convert"
         self.batch_size = 10

@@ -10,6 +10,8 @@ from qtpy.QtGui import *
 
 # app specific libraries
 import control.widgets as widgets
+#import control.widgets_potentiostat as widgets_potentiostat
+import control.potentiostat_panel_v2 as widgets_potentiostat
 import control.camera_emergent_cleaned as camera
 import control.core_simple as core
 import control.microcontroller as microcontroller
@@ -63,6 +65,7 @@ class OctopiGUI(QMainWindow):
         
         self.recordTabWidget = QTabWidget()
         self.recordTabWidget.addTab(self.recordingControlWidget, "Simple Recording")
+        self.potentiostatWidget = widgets_potentiostat.potentialstatControlWidget()
 
 
         # layout widgets
@@ -70,6 +73,7 @@ class OctopiGUI(QMainWindow):
         layout.addWidget(self.liveControlWidget)
         layout.addWidget(self.navigationWidget)
         layout.addWidget(self.recordTabWidget)
+        layout.addWidget(self.potentiostatWidget)
         layout.addStretch()
 
         # transfer the layout to the central widget

@@ -329,6 +329,11 @@ class RecordingWidget(QFrame):
         self.btn_record_5000fps.setChecked(False)
         self.btn_record_5000fps.setDefault(False)
 
+        self.btn_run_sensitivity = QPushButton("Run sensitivity script")
+        self.btn_run_sensitivity.setCheckable(True)
+        self.btn_run_sensitivity.setChecked(False)
+        self.btn_run_sensitivity.setDefault(False)
+
         grid_line1 = QGridLayout()
         grid_line1.addWidget(QLabel('Saving Path'))
         grid_line1.addWidget(self.lineEdit_savingDir, 0,1)
@@ -350,6 +355,7 @@ class RecordingWidget(QFrame):
         self.grid.addLayout(grid_line3)
         self.grid.addWidget(self.btn_record)
         self.grid.addWidget(self.btn_record_5000fps)
+        self.grid.addWidget(self.btn_run_sensitivity)
         self.setLayout(self.grid)
 
  
@@ -358,6 +364,7 @@ class RecordingWidget(QFrame):
         self.btn_setSavingDir.clicked.connect(self.set_saving_dir)
         self.btn_record.clicked.connect(self.toggle_recording)
         self.btn_record_5000fps.clicked.connect(self.toggle_recording_5000fps)
+        self.btn_run_sensitivity.clicked.connect(self.run_sensitivity_script)
         self.entry_saveFPS.valueChanged.connect(self.streamHandler.set_save_fps)
         self.entry_timeLimit.valueChanged.connect(self.imageSaver.set_recording_time_limit)
         self.imageSaver.stop_recording.connect(self.stop_recording)
@@ -396,7 +403,7 @@ class RecordingWidget(QFrame):
             self.lineEdit_experimentID.setEnabled(False)
             self.btn_setSavingDir.setEnabled(False)
             self.btn_record.setText('Stop Recording')
-            self.imageSaver.start_new_experiment(self.lineEdit_experimentID.text())
+            self.last_exp_dir = self.imageSaver.start_new_experiment(self.lineEdit_experimentID.text())
             self.streamHandler.start_recording()
             
         else:
@@ -412,6 +419,28 @@ class RecordingWidget(QFrame):
         self.btn_setSavingDir.setEnabled(True)
         self.camera.high_performance_recording = False
 
+    def run_sensitivity_script(self):
+        
+        print(self.last_exp_dir)
+
+        # Path to the script you attached (adjust if it's elsewhere)
+        script_path = "C:/Users/user/Documents/Github/Squid_LEAP/software_simple\post_process_script/leap_bmp_postprocess_v5.py" 
+
+        # Optional: you can pre-seed rows/cols/box/fps here if you want (script still shows the grid adjuster)
+        # Example uses defaults; add flags like "--rows 8 --cols 9 --box 32 --fps 5000" if desired.
+        cmd = [sys.executable, str(script_path),
+            "--exp", str(self.last_exp_dir),
+            "--init-quad", "auto"]  # seeds TL/TR/BL/BR at image border insets
+
+        # Launch and let the script open its own ROI + grid UI
+        try:
+            subprocess.Popen(cmd)  # or run(..., check=True) if you want to wait/block
+        except Exception as e:
+            print("Launch failed")
+
+
+
+
     def toggle_recording_5000fps(self, pressed):
         # Require base path
         if self.base_path_is_set == False:
@@ -425,10 +454,10 @@ class RecordingWidget(QFrame):
             try:
                 self.experiment_ID = self.lineEdit_experimentID.text() + '_' + datetime.now().strftime('%Y-%m-%d_%H-%M-%S.%f')
                 
-                target = os.path.join(self.lineEdit_savingDir.text(),self.experiment_ID)
-                os.mkdir(target)
+                self.last_exp_dir = os.path.join(self.lineEdit_savingDir.text(),self.experiment_ID)
+                os.mkdir(self.last_exp_dir)
                 
-                self.camera.set_output_path(target)
+                self.camera.set_output_path(self.last_exp_dir)
                 self.camera.set_max_frame(5000 * self.entry_timeLimit.value()) ## TO DO
                 self.camera.high_performance_recording = True
                 self.camera.start_high_performance_recording() # had start_strem effect included

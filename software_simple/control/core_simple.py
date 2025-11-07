@@ -198,12 +198,14 @@ class ImageSaver(QObject):
         self.recording_start_time = time.time()
         # create a new folder
         try:
-            os.mkdir(os.path.join(self.base_path,self.experiment_ID))
+            exp_dir = os.path.join(self.base_path,self.experiment_ID)
+            os.mkdir(exp_dir)
             # to do: save configuration
         except:
             pass
         # reset the counter
         self.counter = 0
+        return exp_dir
 
     def close(self):
         self.queue.join()
