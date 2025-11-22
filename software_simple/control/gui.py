@@ -11,7 +11,7 @@ from qtpy.QtGui import *
 # app specific libraries
 import control.widgets as widgets
 #import control.widgets_potentiostat as widgets_potentiostat
-import control.potentiostat_panel_v2 as widgets_potentiostat
+import control.potentiostat_panel_v3 as widgets_potentiostat
 import control.camera_emergent_cleaned as camera
 import control.core_simple as core
 import control.microcontroller as microcontroller
@@ -58,14 +58,14 @@ class OctopiGUI(QMainWindow):
 
         self.liveControlWidget = widgets.LiveControlWidget(self.streamHandler,self.liveController,show_trigger_options=True,show_display_options=True,show_autolevel=SHOW_AUTOLEVEL_BTN,autolevel=AUTOLEVEL_DEFAULT_SETTING)
         self.navigationWidget = widgets.NavigationWidget(self.navigationController)
-
-        self.recordingControlWidget = widgets.RecordingWidget(self.streamHandler,self.imageSaver)
+        self.potentiostatWidget = widgets_potentiostat.potentialstatControlWidget()
+        self.recordingControlWidget = widgets.RecordingWidget(self.streamHandler,self.imageSaver, self.potentiostatWidget)
         self.recordingControlWidget.set_live_widget(self.liveControlWidget) # enable changing from software to contineous
         self.recordingControlWidget.set_camera(self.camera)
         
         self.recordTabWidget = QTabWidget()
         self.recordTabWidget.addTab(self.recordingControlWidget, "Simple Recording")
-        self.potentiostatWidget = widgets_potentiostat.potentialstatControlWidget()
+        
 
 
         # layout widgets

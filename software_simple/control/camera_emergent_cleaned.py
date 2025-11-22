@@ -48,7 +48,7 @@ DEFAULT_EXPOSURE_US = 160       # microseconds, e.g. 160 us = 0.16 ms
 OUTPUT_PATH = "output/EVT_Py_convert"
 
 # Load the C++ shared library (DLL)
-save_lib = ctypes.WinDLL("drivers and libraries/emergent/DirectIO.dll")  # Replace with actual path
+save_lib = ctypes.WinDLL("drivers/emergent/DirectIO.dll")  # Replace with actual path
 save_lib.save_direct_io.argtypes = [ctypes.c_char_p, ctypes.POINTER(ctypes.c_uint8), ctypes.c_size_t]
 save_lib.save_direct_io.restype = ctypes.c_int  # Returns bytes written
 

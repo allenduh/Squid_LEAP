@@ -283,13 +283,19 @@ class LiveControlWidget(QFrame):
 
 
 class RecordingWidget(QFrame):
-    def __init__(self, streamHandler, imageSaver, main=None, *args, **kwargs):
+    def __init__(self, streamHandler, imageSaver, potentiostatWidget, main=None, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.imageSaver = imageSaver # for saving path control
         self.streamHandler = streamHandler
+        self.pstat = potentiostatWidget
         self.base_path_is_set = False
         self.add_components()
         self.setFrameStyle(QFrame.Panel | QFrame.Raised)
+        self._exp_iv_target = None
+        self.pstat.iv_dict_from_gate_once.connect(self._on_pstat_iv_done)
+        self.experiment_ID = None
+        self.exp_dir = None
+        
 
     def add_components(self):
         self.btn_setSavingDir = QPushButton('Browse')
@@ -310,14 +316,14 @@ class RecordingWidget(QFrame):
         self.entry_saveFPS.setMinimum(0.02)
         self.entry_saveFPS.setMaximum(4000)
         self.entry_saveFPS.setSingleStep(1)
-        self.entry_saveFPS.setValue(10)
+        self.entry_saveFPS.setValue(100)
 
 
         self.entry_timeLimit = QSpinBox()
         self.entry_timeLimit.setMinimum(-1)
         self.entry_timeLimit.setMaximum(60*60*24*30)
         self.entry_timeLimit.setSingleStep(1)
-        self.entry_timeLimit.setValue(5)
+        self.entry_timeLimit.setValue(10)
 
         self.btn_record = QPushButton("Start Recording")
         self.btn_record.setCheckable(True)
@@ -392,6 +398,26 @@ class RecordingWidget(QFrame):
 
         self.camera.set_output_path(save_dir_base)
 
+    def _on_pstat_iv_done(self, iv_dict: dict):
+        """
+        Called when potentiostat panel emits iv_dict_from_gate_once on Stop.
+        Saves into the current experiment dir (npz + tiny JSON).
+        """
+
+        try:
+            print(self.experiment_ID)
+            dirpath = self.experiment_ID
+            stem = os.path.basename(os.path.normpath(dirpath))
+            npz_path = os.path.join(dirpath, f"{stem}.npz")
+            
+            t   = np.asarray(iv_dict.get("t", []), dtype=np.float64)
+            vwe = np.asarray(iv_dict.get("V_we", []), dtype=np.float64)
+            cur = np.asarray(iv_dict.get("I", []), dtype=np.float64)
+            np.savez(npz_path, t=t, V_we=vwe, I=cur)
+
+        except Exception as e:
+            print("Failed to save potentiostat IV:", e)
+
     def toggle_recording(self,pressed):
         if self.base_path_is_set == False:
             self.btn_record.setChecked(False)
@@ -403,11 +429,50 @@ class RecordingWidget(QFrame):
             self.lineEdit_experimentID.setEnabled(False)
             self.btn_setSavingDir.setEnabled(False)
             self.btn_record.setText('Stop Recording')
-            self.last_exp_dir = self.imageSaver.start_new_experiment(self.lineEdit_experimentID.text())
+            self.start_new_experiment()
+            
             self.streamHandler.start_recording()
+
+            self.pstat.btn_start.click()
             
         else:
             self.stop_recording()
+
+    def start_new_experiment(self):
+        sample_id = self.lineEdit_experimentID.text()
+        timestamp_short = datetime.now().strftime('%H-%M-%S')
+        timestamp_long = datetime.now().strftime('%Y-%m-%d_%H-%M-%S.%f')
+        delta_mv = self.pstat.v_plus.value() - self.pstat.v_minus.value()
+        range_str = f"{int(delta_mv)}mV"
+
+        self.experiment_ID = f"{sample_id}_{range_str}_{timestamp_short}"
+
+
+        self.imageSaver.recording_start_time = time.time()
+        self.imageSaver.experiment_ID = self.experiment_ID
+        self.imageSaver.counter = 0
+
+        # create a new folder
+        try:
+            self.exp_dir = os.path.join(self.imageSaver.base_path,self.experiment_ID)
+            os.mkdir(self.exp_dir)
+
+        except:
+            pass
+
+        meta = dict(
+            vmin = float(self.pstat.v_minus.value()),
+            vmax = float(self.pstat.v_plus.value()),
+            timestamp = timestamp_long,
+            experiment_ID = self.experiment_ID,
+            fps = float(self.entry_saveFPS.value()),
+        )
+
+        np.save(os.path.join(self.exp_dir, "experiment_meta.np"), meta)
+
+        
+
+
 
     # stop_recording can be called by imageSaver
     def stop_recording(self):
@@ -420,16 +485,14 @@ class RecordingWidget(QFrame):
         self.camera.high_performance_recording = False
 
     def run_sensitivity_script(self):
-        
-        print(self.last_exp_dir)
 
         # Path to the script you attached (adjust if it's elsewhere)
-        script_path = "C:/Users/user/Documents/Github/Squid_LEAP/software_simple\post_process_script/leap_bmp_postprocess_v5.py" 
+        script_path = "C:/Users/user/Documents/Github/Squid_LEAP/software_simple\post_process_script/leap_bmp_postprocess_v6.py" 
 
         # Optional: you can pre-seed rows/cols/box/fps here if you want (script still shows the grid adjuster)
         # Example uses defaults; add flags like "--rows 8 --cols 9 --box 32 --fps 5000" if desired.
         cmd = [sys.executable, str(script_path),
-            "--exp", str(self.last_exp_dir),
+            "--exp", str(self.exp_dir),
             "--init-quad", "auto"]  # seeds TL/TR/BL/BR at image border insets
 
         # Launch and let the script open its own ROI + grid UI
@@ -454,10 +517,10 @@ class RecordingWidget(QFrame):
             try:
                 self.experiment_ID = self.lineEdit_experimentID.text() + '_' + datetime.now().strftime('%Y-%m-%d_%H-%M-%S.%f')
                 
-                self.last_exp_dir = os.path.join(self.lineEdit_savingDir.text(),self.experiment_ID)
-                os.mkdir(self.last_exp_dir)
+                self.experiment_ID = os.path.join(self.lineEdit_savingDir.text(),self.experiment_ID)
+                os.mkdir(self.experiment_ID)
                 
-                self.camera.set_output_path(self.last_exp_dir)
+                self.camera.set_output_path(self.experiment_ID)
                 self.camera.set_max_frame(5000 * self.entry_timeLimit.value()) ## TO DO
                 self.camera.high_performance_recording = True
                 self.camera.start_high_performance_recording() # had start_strem effect included

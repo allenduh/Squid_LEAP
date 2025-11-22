@@ -2,64 +2,9 @@ import os
 import sys
 import glob
 from pathlib import Path
-from configparser import ConfigParser
 import json
 import csv
 
-import squid.logging
-
-log = squid.logging.get_logger(__name__)
-
-
-def conf_attribute_reader(string_value):
-    """
-    :brief: standardized way for reading config entries
-    that are strings, in priority order
-    None -> bool -> dict/list (via json) -> int -> float -> string
-    REMEMBER TO ENCLOSE PROPERTY NAMES IN LISTS/DICTS IN
-    DOUBLE QUOTES
-    """
-    actualvalue = str(string_value).strip()
-    try:
-        if str(actualvalue) == "None":
-            return None
-    except:
-        pass
-    try:
-        if str(actualvalue) == "True" or str(actualvalue) == "true":
-            return True
-        if str(actualvalue) == "False" or str(actualvalue) == "false":
-            return False
-    except:
-        pass
-    try:
-        actualvalue = json.loads(actualvalue)
-    except:
-        try:
-            actualvalue = int(str(actualvalue))
-        except:
-            try:
-                actualvalue = float(actualvalue)
-            except:
-                actualvalue = str(actualvalue)
-    return actualvalue
-
-
-def populate_class_from_dict(myclass, options):
-    """
-    :brief: helper function to establish a compatibility
-        layer between new way of storing config and current
-        way of accessing it. assumes all class attributes are
-        all-uppercase, and pattern-matches attributes in
-        priority order dict/list (json) -> -> int -> float-> string
-    REMEMBER TO ENCLOSE PROPERTY NAMES IN LISTS IN DOUBLE QUOTES
-    """
-    for key, value in options:
-        if key.startswith('_') and key.endswith('options'):
-            continue
-        actualkey = key.upper()
-        actualvalue = conf_attribute_reader(value)
-        setattr(myclass, actualkey, actualvalue)
 
 class TriggerMode:
     SOFTWARE = 'Software Trigger'
@@ -85,8 +30,6 @@ class MicrocontrollerDef:
     MSG_LENGTH = 24
     CMD_LENGTH = 8
     N_BYTES_POS = 4
-
-USE_SEPARATE_MCU_FOR_DAC = False
 
 class MCU_PINS:
     PWM1 = 5
@@ -145,9 +88,6 @@ class CMD_SET2:
     SET_CAMERA_TRIGGER_FREQUENCY = 1
     START_CAMERA_TRIGGERING = 2
     STOP_CAMERA_TRIGGERING = 3
-
-BIT_POS_JOYSTICK_BUTTON = 0
-BIT_POS_SWITCH = 1
 
 class HOME_OR_ZERO:
     HOME_NEGATIVE = 1 # motor moves along the negative direction (MCU coordinates)
@@ -210,9 +150,8 @@ class CAMERA_CONFIG:
     ROI_WIDTH_DEFAULT = 3104
     ROI_HEIGHT_DEFAULT = 2084
 
-###########################################################
-#### machine specific configurations - to be overridden ###
-###########################################################
+BIT_POS_JOYSTICK_BUTTON = 0
+BIT_POS_SWITCH = 1
 ROTATE_IMAGE_ANGLE = None
 FLIP_IMAGE = None # 'Horizontal', 'Vertical', 'Both'
 
@@ -338,13 +277,6 @@ DEFAULT_SAVING_PATH = str(Path.home()) + "/Downloads"
 
 DEFAULT_PIXEL_FORMAT = 'MONO12'
 
-class PLATE_READER:
-    NUMBER_OF_ROWS = 8
-    NUMBER_OF_COLUMNS = 12
-    ROW_SPACING_MM = 9
-    COLUMN_SPACING_MM = 9
-    OFFSET_COLUMN_1_MM = 20
-    OFFSET_ROW_A_MM = 20
 
 DEFAULT_DISPLAY_CROP = 100 # value ranges from 1 to 100 - image display crop size 
 
@@ -356,10 +288,6 @@ DEFAULT_OBJECTIVE = '10x (Mitutoyo)'
 TRACKERS = ['csrt', 'kcf', 'mil', 'tld', 'medianflow','mosse','daSiamRPN']
 DEFAULT_TRACKER = 'csrt'
 
-ENABLE_TRACKING = False
-TRACKING_SHOW_MICROSCOPE_CONFIGURATIONS = False # set to true when doing multimodal acquisition
-if ENABLE_TRACKING:
-    DEFAULT_DISPLAY_CROP = 100
 
 class AF:
     STOP_THRESHOLD = 0.85
@@ -374,7 +302,6 @@ class Tracking:
     INIT_METHODS = ["roi"]
     DEFAULT_INIT_METHOD = "roi"
 
-SHOW_DAC_CONTROL = False
 
 class SLIDE_POSITION:
     LOADING_X_MM = 30
@@ -392,9 +319,6 @@ class OUTPUT_GAINS:
     CHANNEL5_GAIN = False
     CHANNEL6_GAIN = False
     CHANNEL7_GAIN = True
-
-SLIDE_POTISION_SWITCHING_TIMEOUT_LIMIT_S = 10
-SLIDE_POTISION_SWITCHING_HOME_EVERYTIME = False
 
 class SOFTWARE_POS_LIMIT:
     X_POSITIVE = 56
@@ -548,28 +472,7 @@ SCIMICROSCOPY_LED_ARRAY_DEFAULT_NA = 0.8
 SCIMICROSCOPY_LED_ARRAY_DEFAULT_COLOR = [1,1,1]
 SCIMICROSCOPY_LED_ARRAY_TURN_ON_DELAY = 0.03 # time to wait before trigger the camera (in seconds)
 
-# Tiled preview
-SHOW_TILED_PREVIEW = False
-PRVIEW_DOWNSAMPLE_FACTOR = 5
 
-# Navigation Bar (Stages)
-SHOW_NAVIGATION_BAR = False
-
-# Stitcher
-ENABLE_STITCHER = False
-IS_HCS = False
-DYNAMIC_REGISTRATION = False
-STITCH_COMPLETE_ACQUISITION = False
-CHANNEL_COLORS_MAP = {
-    "405": {"hex": 0x3300FF, "name": "blue"},
-    "488": {"hex": 0x1FFF00, "name": "green"},
-    "561": {"hex": 0xFFCF00, "name": "yellow"},
-    "638": {"hex": 0xFF0000, "name": "red"},
-    "730": {"hex": 0x770000, "name": "dark red"},
-    "R": {"hex": 0xFF0000, "name": "red"},
-    "G": {"hex": 0x1FFF00, "name": "green"},
-    "B": {"hex": 0x3300FF, "name": "blue"}
-}
 
 # Emission filter wheel
 USE_ZABER_EMISSION_FILTER_WHEEL = False
@@ -581,58 +484,8 @@ OPTOSPIN_EMISSION_FILTER_WHEEL_SPEED_HZ = 50
 OPTOSPIN_EMISSION_FILTER_WHEEL_DELAY_MS = 70
 OPTOSPIN_EMISSION_FILTER_WHEEL_TTL_TRIGGER = False
 
-# Stage
-USE_PRIOR_STAGE = False
-PRIOR_STAGE_SN = ""
 
-def read_objectives_csv(file_path):
-    objectives = {}
-    with open(file_path, 'r') as csvfile:
-        reader = csv.DictReader(csvfile)
-        for row in reader:
-            objectives[row['name']] = {
-                'magnification': float(row['magnification']),
-                'NA': float(row['NA']),
-                'tube_lens_f_mm': float(row['tube_lens_f_mm'])
-            }
-    return objectives
 
-def read_sample_formats_csv(file_path):
-    sample_formats = {}
-    with open(file_path, 'r') as csvfile:
-        reader = csv.DictReader(csvfile)
-        for row in reader:
-            format_key = int(row['format'])
-            sample_formats[format_key] = {
-                'a1_x_mm': float(row['a1_x_mm']),
-                'a1_y_mm': float(row['a1_y_mm']),
-                'a1_x_pixel': int(row['a1_x_pixel']),
-                'a1_y_pixel': int(row['a1_y_pixel']),
-                'well_size_mm': float(row['well_size_mm']),
-                'well_spacing_mm': float(row['well_spacing_mm']),
-                'number_of_skip': int(row['number_of_skip']),
-                'rows': int(row['rows']),
-                'cols': int(row['cols'])
-            }
-    return sample_formats
-
-OBJECTIVES_CSV_PATH = 'objectives.csv'
-SAMPLE_FORMATS_CSV_PATH = 'sample_formats.csv'
-
-OBJECTIVES = read_objectives_csv(os.path.join('configurations', OBJECTIVES_CSV_PATH))
-WELLPLATE_FORMAT_SETTINGS = read_sample_formats_csv(os.path.join('configurations', SAMPLE_FORMATS_CSV_PATH))
-
-NUMBER_OF_SKIP = WELLPLATE_FORMAT_SETTINGS[WELLPLATE_FORMAT]['number_of_skip'] # num rows/cols to skip on wellplate edge
-WELL_SIZE_MM = WELLPLATE_FORMAT_SETTINGS[WELLPLATE_FORMAT]['well_size_mm']
-WELL_SPACING_MM = WELLPLATE_FORMAT_SETTINGS[WELLPLATE_FORMAT]['well_spacing_mm']
-A1_X_MM = WELLPLATE_FORMAT_SETTINGS[WELLPLATE_FORMAT]['a1_x_mm'] # measured stage position - to update
-A1_Y_MM = WELLPLATE_FORMAT_SETTINGS[WELLPLATE_FORMAT]['a1_y_mm'] # measured stage position - to update
-A1_X_PIXEL = WELLPLATE_FORMAT_SETTINGS[WELLPLATE_FORMAT]['a1_x_pixel'] # coordinate on the png
-A1_Y_PIXEL = WELLPLATE_FORMAT_SETTINGS[WELLPLATE_FORMAT]['a1_y_pixel'] # coordinate on the png
-
-##########################################################
-#### start of loading machine specific configurations ####
-##########################################################
 CACHED_CONFIG_FILE_PATH = None
 
 # Piezo configuration items
@@ -651,72 +504,6 @@ AWB_RATIOS_R = 1.375
 AWB_RATIOS_G = 1
 AWB_RATIOS_B = 1.4141
 
-try:
-    with open("cache/config_file_path.txt", 'r') as file:
-        for line in file:
-            CACHED_CONFIG_FILE_PATH = line
-            break
-except FileNotFoundError:
-    CACHED_CONFIG_FILE_PATH = None
-
-config_files = glob.glob('.' + '/' + 'configuration*.ini')
-if config_files:
-    if len(config_files) > 1:
-        if CACHED_CONFIG_FILE_PATH in config_files:
-            log.info(f'defaulting to last cached config file at \'{CACHED_CONFIG_FILE_PATH}\'')
-            config_files = [CACHED_CONFIG_FILE_PATH]
-        else:
-            log.error('multiple machine configuration files found, the program will exit')
-            sys.exit(1)
-    log.info('load machine-specific configuration')
-    #exec(open(config_files[0]).read())
-    cfp = ConfigParser()
-    cfp.read(config_files[0])
-    var_items = list(locals().keys())
-    for var_name in var_items:
-        if type(locals()[var_name]) is type:
-            continue
-        varnamelower = var_name.lower()
-        if varnamelower not in cfp.options("GENERAL"):
-            continue
-        value = cfp.get("GENERAL",varnamelower)
-        actualvalue = conf_attribute_reader(value)
-        locals()[var_name] = actualvalue
-    for classkey in var_items:
-        myclass = None
-        classkeyupper = classkey.upper()
-        pop_items = None
-        try:
-            pop_items = cfp.items(classkeyupper)
-        except:
-            continue
-        if type(locals()[classkey]) is not type:
-            continue
-        myclass = locals()[classkey]
-        populate_class_from_dict(myclass,pop_items)
-    
-    with open("cache/config_file_path.txt", 'w') as file:
-        file.write(config_files[0])
-    CACHED_CONFIG_FILE_PATH = config_files[0]
-else:
-    log.warning('configuration*.ini file not found, defaulting to legacy configuration')
-    config_files = glob.glob('.' + '/' + 'configuration*.txt')
-    if config_files:
-        if len(config_files) > 1:
-            log.error('multiple machine configuration files found, the program will exit')
-            sys.exit(1)
-        log.info('load machine-specific configuration')
-        exec(open(config_files[0]).read())
-    else:
-        log.error('machine-specific configuration not present, the program will exit')
-        sys.exit(1)
-##########################################################
-##### end of loading machine specific configurations #####
-##########################################################
-
-# objective piezo
-if ENABLE_OBJECTIVE_PIEZO == False:
-    MULTIPOINT_USE_PIEZO_FOR_ZSTACKS = False
 
 # saving path
 if not (DEFAULT_SAVING_PATH.startswith(str(Path.home()))):
@@ -732,5 +519,3 @@ X_HOME_SAFETY_MARGIN_UM = 50
 Y_HOME_SAFETY_MARGIN_UM = 50
 Z_HOME_SAFETY_MARGIN_UM = 600 
 
-if ENABLE_TRACKING:
-    DEFAULT_DISPLAY_CROP = Tracking.DEFAULT_DISPLAY_CROP

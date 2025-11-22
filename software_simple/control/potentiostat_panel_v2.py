@@ -27,8 +27,8 @@ try:
 except ImportError:
     pg = None
 
-import kbio.kbio_types as KBIO
-from kbio.kbio_api import KBIO_api
+import drivers.ECLab.kbio_types as KBIO
+from drivers.ECLab.kbio_api import KBIO_api
 
 
 # ----------------------------
@@ -47,7 +47,7 @@ class potentialstat_controller:
         self.channel = int(channel)
         if dll_path is None:
             # Adjust if your DLL path differs
-            dll_path = "kbio\\lib\\EClib64.dll"
+            dll_path = "drivers\\ECLab\\lib\\EClib64.dll"
         self.api = KBIO_api(dll_path)
         self.id_, self.device_info = self.api.Connect(self.address)
 
@@ -95,12 +95,12 @@ class potentialstat_controller:
         self.final_parameters = KBIO.EccParams(nb, arr)
 
     def load_technique_CA(self):
-        tech_file = "kbio\\lib\\ca4.ecc"  # adjust per board family if needed
+        tech_file = "drivers\\ECLab\\lib\\ca4.ecc"  # adjust per board family if needed
         self.api.LoadTechnique(self.id_, self.channel, tech_file, self.final_parameters,
                                first=True, last=True, display=False)
 
     def load_technique_OCV(self, record_dt=0.1):
-        tech_file = "kbio\\lib\\ocv4.ecc"
+        tech_file = "drivers\\ECLab\\lib\\ocv4.ecc"
         parm = KBIO.EccParam()
         self.api.DefineParameter('Record_every_dT', float(record_dt), 0, parm)
         arr = KBIO.ECC_PARM_ARRAY(1); arr[0] = parm
@@ -182,15 +182,17 @@ class potentialstatControlWidget(QFrame):
         # show hardware conf once
         self._refresh_hw_label()
 
+        self._start_ocv_background()
+
     def _build_ui(self):
         # --- Controls ---
         self.v_plus  = QDoubleSpinBox();  self.v_plus.setRange(-500, 500);  self.v_plus.setValue(0.0);   self.v_plus.setSingleStep(1)
         self.v_minus = QDoubleSpinBox();  self.v_minus.setRange(-500, 500); self.v_minus.setValue(-10.0);self.v_minus.setSingleStep(1)
-        self.cycles  = QDoubleSpinBox();  self.cycles.setRange(0, 1000);    self.cycles.setValue(10);    self.cycles.setSingleStep(1)
+        self.cycles  = QDoubleSpinBox();  self.cycles.setRange(0, 1000);    self.cycles.setValue(5);    self.cycles.setSingleStep(1)
         self.t_plus  = QDoubleSpinBox();  self.t_plus.setRange(0.001, 1000.0); self.t_plus.setDecimals(3); self.t_plus.setSingleStep(0.001); self.t_plus.setValue(1.0)
         self.t_minus = QDoubleSpinBox();  self.t_minus.setRange(0.001, 1000.0); self.t_minus.setDecimals(3); self.t_minus.setSingleStep(0.001); self.t_minus.setValue(1.0)
-        self.dt_min  = QDoubleSpinBox();  self.dt_min.setRange(0.0, 10.0);  self.dt_min.setDecimals(3);  self.dt_min.setValue(0.10); self.dt_min.setSingleStep(0.01)
-        self.dI_min  = QDoubleSpinBox();  self.dI_min.setRange(0.0, 10.0);  self.dI_min.setDecimals(6);  self.dI_min.setValue(0.10); self.dI_min.setSingleStep(0.01)
+        self.dt_min  = QDoubleSpinBox();  self.dt_min.setRange(0.0, 10.0);  self.dt_min.setDecimals(3);  self.dt_min.setValue(0.001); self.dt_min.setSingleStep(0.01)
+        self.dI_min  = QDoubleSpinBox();  self.dI_min.setRange(0.0, 10.0);  self.dI_min.setDecimals(6);  self.dI_min.setValue(0.001); self.dI_min.setSingleStep(0.01)
         self.chk_rel_ocv = QCheckBox("V relative to OCV")
 
         row0 = QHBoxLayout()
@@ -246,6 +248,15 @@ class potentialstatControlWidget(QFrame):
         self.btn_clear.clicked.connect(self._on_clear)
         self.btn_save.clicked.connect(self._on_save_npz)
 
+    def _start_ocv_background(self):
+        """Start/keep OCV running in the background (live label + optional plot)."""
+        self.ctrl.load_technique_OCV(record_dt=float(self.dt_min.value()))
+        self.ctrl.start()
+        self._mode = "ocv"
+        self._clear_buffers()              # keep the V trace clean if you don't want OCV drawn
+        if not self.timer.isActive():
+            self.timer.start()
+        
     # --- HW status label ---
     def _refresh_hw_label(self):
         hw = self.ctrl.get_hardware_conf()
@@ -262,29 +273,33 @@ class potentialstatControlWidget(QFrame):
             mode = str(hw.mode)
         self.lbl_hw.setText(f"HW: {cnx}/{mode}")
 
+
     # --- Actions ---
     def _on_ocv(self):
         # Continuous OCV (live label, can also plot on V_we curve)
-        self.ctrl.load_technique_OCV(record_dt=float(self.dt_min.value()))
-        self.ctrl.start()
-        self._mode = "ocv"
-        self._clear_buffers()
-        self.timer.start()
+        self._start_ocv_background()
 
     def _on_start(self):
+        # pause background OCV so it doesn't fight CA
+        try:
+            self.ctrl.stop()
+        except Exception:
+            pass
+        self._mode = "idle"
+        
         # Prepare CA protocol
         v_plus  = float(self.v_plus.value())  / 1000.0  # mV→V
         v_minus = float(self.v_minus.value()) / 1000.0
         t_plus  = float(self.t_plus.value())
         t_minus = float(self.t_minus.value())
-        cycles  = int(self.cycles.value())
+        cycles  = int(self.cycles.value()) 
 
         if self.chk_rel_ocv.isChecked() and self._last_ocv is not None:
             v_plus  += self._last_ocv
             v_minus += self._last_ocv
 
         self.ctrl.steps = [voltage_step(v_plus, t_plus), voltage_step(v_minus, t_minus)]
-        self.ctrl.repeat_count = cycles
+        self.ctrl.repeat_count = cycles -1
         self.ctrl.record_dt = float(self.dt_min.value())
         self.ctrl.record_dI = float(self.dI_min.value())
 
@@ -298,12 +313,16 @@ class potentialstatControlWidget(QFrame):
         self.timer.start()
 
     def _on_stop(self):
+        # dump buffers for downstream
+        to_emit = {"t": self._t[:], "V_we": self._v[:], "I": self._i[:]}
+        print(to_emit)
+        self.iv_dict_from_gate_once.emit(to_emit)
+
         self.timer.stop()
         self.ctrl.stop()
-        # dump buffers for downstream
-        self.iv_dict_from_gate_once.emit({"t": self._t[:], "V_we": self._v[:], "I": self._i[:]})
-        self._mode = "idle"
-        self._refresh_hw_label()
+
+        # resume background OCV
+        # self._start_ocv_background()
 
     def _on_clear(self):
         self._clear_buffers()
